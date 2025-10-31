@@ -98,14 +98,14 @@ func runAirdrop(c *cli.Context) error {
 
 func spam(config *spammer.Config, spamFn spammer.Spam, airdropValue *big.Int) error {
 	// Make sure the accounts are unstuck before sending any transactions
-	config.Logger.Info("unstucking accounts")
+	config.Logger.Info("Unstucking accounts")
 	spammer.Unstuck(config)
 	for {
-		config.Logger.Info("airdropping funds to accounts")
+		config.Logger.Info("Airdropping funds to accounts")
 		if err := spammer.Airdrop(config, airdropValue); err != nil {
 			return err
 		}
-		config.Logger.Info("spamming transactions")
+		config.Logger.Info("Spamming transactions")
 		spammer.SpamTransactions(config, spamFn)
 		time.Sleep(time.Duration(config.SlotTime) * time.Second)
 	}

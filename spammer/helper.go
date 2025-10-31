@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math/big"
 	"time"
@@ -22,7 +23,7 @@ func SendTx(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, 
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
 	nonce, err := backend.NonceAt(context.Background(), sender, nil)
 	if err != nil {
-		slog.Warn("failed to get pending nonce", "error", err, "sender", sender)
+		slog.Warn(fmt.Sprintf("Failed to get pending nonce: %v (sender=%s)", err, sender))
 	}
 	return sendTxWithNonce(sk, backend, to, value, nonce)
 }
@@ -91,7 +92,7 @@ func tryUnstuck(config *Config, sk *ecdsa.PrivateKey) error {
 		if noTx > batchSize {
 			noTx = batchSize
 		}
-		config.Logger.Info("sending transactions to unstuck account", "account", addr, "count", noTx)
+		config.Logger.Info(fmt.Sprintf("Sending %d transactions to unstuck account %s", noTx, addr))
 		tx, err := sendRecurringTx(sk, client, addr, big.NewInt(1), noTx)
 		if err != nil {
 			return err
@@ -102,7 +103,7 @@ func tryUnstuck(config *Config, sk *ecdsa.PrivateKey) error {
 			return err
 		}
 	}
-	config.Logger.Error("failed to unstuck account after 100 tries", "account", addr)
+	config.Logger.Error(fmt.Sprintf("Failed to unstuck account %s after 100 tries", addr))
 	return errors.New("unstuck timed out, please retry manually")
 }
 
@@ -119,11 +120,8 @@ func isStuck(config *Config, account common.Address) (uint64, error) {
 	}
 
 	if pendingNonce != nonce {
-		config.Logger.Info("account is stuck",
-			"account", account,
-			"pending_nonce", pendingNonce,
-			"current_nonce", nonce,
-			"missing_nonces", pendingNonce-nonce)
+		config.Logger.Info(fmt.Sprintf("Account %s is stuck: pending=%d, current=%d, missing=%d",
+			account, pendingNonce, nonce, pendingNonce-nonce))
 		return pendingNonce - nonce, nil
 	}
 	return 0, nil

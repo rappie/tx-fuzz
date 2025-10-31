@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"fmt"
 	"log/slog"
 	"math/big"
 
@@ -40,7 +41,7 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 	if err != nil {
 		panic(err)
 	}
-	slog.Debug("using nonce", "nonce", nonce)
+	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, err := backend.SuggestGasPrice(context.Background())
 	if err != nil {
 		panic(err)
@@ -63,7 +64,7 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 	}
 	if gas, err := backend.EstimateGas(context.Background(), msg); err != nil {
 		msg.Gas = uint64(5_000_000)
-		slog.Warn("failed to estimate gas, using default", "error", err, "default_gas", msg.Gas)
+		slog.Warn(fmt.Sprintf("Failed to estimate gas, using default %d: %v", msg.Gas, err))
 	} else {
 		msg.Gas = gas
 	}
@@ -87,7 +88,7 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 	}
 
 	if err := cl.CallContext(context.Background(), nil, "eth_sendRawTransaction", hexutil.Encode(rlpData)); err != nil {
-		slog.Warn("transaction failed", "error", err)
+		slog.Warn(fmt.Sprintf("Transaction failed: %v", err))
 	}
 	return signedTx
 }
@@ -110,7 +111,7 @@ func ExecAuthWithNonce(addr common.Address, nonce uint64, data []byte, authList 
 	if err != nil {
 		panic(err)
 	}
-	slog.Debug("using nonce", "nonce", nonce)
+	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, err := backend.SuggestGasPrice(context.Background())
 	if err != nil {
 		panic(err)
@@ -139,7 +140,7 @@ func ExecAuthWithNonce(addr common.Address, nonce uint64, data []byte, authList 
 	}
 	_tx = signedTx
 	if err := cl.CallContext(context.Background(), nil, "eth_sendRawTransaction", hexutil.Encode(rlpData)); err != nil {
-		slog.Warn("transaction failed", "error", err)
+		slog.Warn(fmt.Sprintf("Transaction failed: %v", err))
 	}
 	return _tx
 }
@@ -196,7 +197,7 @@ func Deploy(bytecode string) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-	slog.Debug("using nonce", "nonce", nonce)
+	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	tx := types.NewContractCreation(nonce, common.Big0, 5_000_000, gp.Mul(gp, common.Big2), common.Hex2Bytes(bytecode))
 	signedTx, _ := types.SignTx(tx, types.NewCancunSigner(chainid), sk)
@@ -218,7 +219,7 @@ func Execute(data []byte, gaslimit uint64) error {
 	if err != nil {
 		panic(err)
 	}
-	slog.Debug("using nonce", "nonce", nonce)
+	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	tx := types.NewContractCreation(nonce, common.Big1, gaslimit, gp.Mul(gp, common.Big2), data)
 	signedTx, _ := types.SignTx(tx, types.NewLondonSigner(chainid), sk)

@@ -24,7 +24,7 @@ import (
 var nonceOffset = 0
 
 func test7702NormalTxs() {
-	slog.Info("test 7702 normal txs scenario")
+	slog.Info("Test 7702 normal txs scenario")
 	var (
 		NumKeys = 512
 		numTxs  = 16
@@ -52,7 +52,7 @@ func test7702NormalTxs() {
 }
 
 func test7702BlobTxs() {
-	slog.Info("test 7702 blob txs scenario")
+	slog.Info("Test 7702 blob txs scenario")
 	var (
 		NumKeys = 128
 		value   = new(big.Int).Lsh(big.NewInt(1), 63)
@@ -119,7 +119,7 @@ func test7702Scenario(keys []*ecdsa.PrivateKey, value *big.Int, sendTxs func(key
 		lastTx = sendAuths(keys[i*callsPerTx:i*callsPerTx+callsPerTx], callerAddr, calleeAddr, nonce+uint64(i))
 	}
 	helper.Wait(lastTx)
-	fmt.Printf("Invalidated transactions in %v\n", time.Since(start))
+	slog.Info(fmt.Sprintf("Invalidated transactions in %v", time.Since(start)))
 	verify(backend, keys)
 }
 
@@ -184,7 +184,7 @@ func ExecWithSK(backend *ethclient.Client, sk *ecdsa.PrivateKey, addr common.Add
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Nonce: %v\n", nonce)
+	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, err := backend.SuggestGasPrice(context.Background())
 	if err != nil {
 		panic(err)
@@ -207,7 +207,7 @@ func ExecWithSK(backend *ethclient.Client, sk *ecdsa.PrivateKey, addr common.Add
 	}
 	if gas, err := backend.EstimateGas(context.Background(), msg); err != nil {
 		msg.Gas = uint64(5_000_000)
-		fmt.Printf("Error estimating gas: %v, defaulting to %v gas\n", err, msg.Gas)
+		slog.Warn(fmt.Sprintf("Error estimating gas, defaulting to %d gas: %v", msg.Gas, err))
 	} else {
 		msg.Gas = gas
 	}
@@ -231,7 +231,7 @@ func ExecWithSK(backend *ethclient.Client, sk *ecdsa.PrivateKey, addr common.Add
 	}
 
 	if err := cl.CallContext(context.Background(), nil, "eth_sendRawTransaction", hexutil.Encode(rlpData)); err != nil {
-		fmt.Println(err)
+		slog.Warn(fmt.Sprintf("Transaction failed: %v", err))
 	}
 	return signedTx
 }

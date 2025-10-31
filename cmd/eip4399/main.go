@@ -15,7 +15,7 @@ import (
 
 func main() {
 	// Setup consistent logging
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	handler := txfuzz.NewCompactHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	slog.SetDefault(slog.New(handler))
 
 	cl, sk := helper.GetRealBackend()

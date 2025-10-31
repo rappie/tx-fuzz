@@ -86,7 +86,7 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 	default:
 		logLevel = slog.LevelInfo
 	}
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
+	handler := txfuzz.NewCompactHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
 	logger := slog.New(handler)
 
 	// Set as default logger so all slog calls use the same format
@@ -112,7 +112,7 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 	var keys []*ecdsa.PrivateKey
 	nKeys := c.Int(flags.CountFlag.Name)
 	if nKeys == 0 || nKeys > len(staticKeys) {
-		logger.Debug("sanitizing count flag", "from", nKeys, "to", len(staticKeys))
+		logger.Debug(fmt.Sprintf("Sanitizing count flag: %d -> %d", nKeys, len(staticKeys)))
 		nKeys = len(staticKeys)
 	}
 	for i := 0; i < nKeys; i++ {
@@ -139,7 +139,7 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 		rnd := make([]byte, 8)
 		crand.Read(rnd)
 		seed = int64(binary.BigEndian.Uint64(rnd))
-		logger.Debug("no seed provided, creating random seed", "seed", fmt.Sprintf("0x%x", seed))
+		logger.Debug(fmt.Sprintf("No seed provided, creating random seed: 0x%x", seed))
 	}
 
 	// Setup Mutator

@@ -3,6 +3,7 @@ package txfuzz
 import (
 	"context"
 	"crypto/sha256"
+	"fmt"
 	"log/slog"
 	"math/big"
 	"math/rand"
@@ -61,14 +62,14 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 		if gasPrice == nil {
 			gasPrice, err = client.SuggestGasPrice(context.Background())
 			if err != nil {
-				slog.Warn("failed to suggest gas price, using default", "error", err, "default", 1)
+				slog.Warn(fmt.Sprintf("Failed to suggest gas price, using default 1: %v", err))
 				gasPrice = big.NewInt(1)
 			}
 		}
 		if chainID == nil {
 			chainID, err = client.ChainID(context.Background())
 			if err != nil {
-				slog.Warn("failed to fetch chain ID, using default", "error", err, "default", 1)
+				slog.Warn(fmt.Sprintf("Failed to fetch chain ID, using default 1: %v", err))
 				chainID = big.NewInt(1)
 			}
 		}
@@ -84,7 +85,7 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 			Data:      code,
 		})
 		if err == nil {
-			slog.Info("successfully estimated gas", "gas", gas)
+			slog.Info(fmt.Sprintf("Successfully estimated gas: %d", gas))
 			gasCost = gas
 		}
 	}

@@ -3,6 +3,7 @@ package spammer
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -156,17 +157,17 @@ func CreateAddressesRaw(N int) []*ecdsa.PrivateKey {
 func Airdrop(config *Config, value *big.Int) error {
 	backend := ethclient.NewClient(config.backend)
 	sender := crypto.PubkeyToAddress(config.faucet.PublicKey)
-	config.Logger.Info("starting airdrop", "faucet", sender)
+	config.Logger.Info(fmt.Sprintf("Starting airdrop from faucet %s", sender))
 	var tx *types.Transaction
 	chainid, err := backend.ChainID(context.Background())
 	if err != nil {
-		config.Logger.Error("failed to get chain ID for airdrop", "error", err)
+		config.Logger.Error(fmt.Sprintf("Failed to get chain ID for airdrop: %v", err))
 		return err
 	}
 	for _, addr := range config.keys {
 		nonce, err := backend.PendingNonceAt(context.Background(), sender)
 		if err != nil {
-			config.Logger.Error("failed to get pending nonce for airdrop", "error", err)
+			config.Logger.Error(fmt.Sprintf("Failed to get pending nonce for airdrop: %v", err))
 			return err
 		}
 		to := crypto.PubkeyToAddress(addr.PublicKey)
@@ -180,19 +181,13 @@ func Airdrop(config *Config, value *big.Int) error {
 		})
 		if err != nil {
 			from := crypto.PubkeyToAddress(config.faucet.PublicKey)
-			config.Logger.Error("failed to estimate gas for airdrop",
-				"error", err,
-				"from", from,
-				"to", to,
-				"gas", 30_000_000,
-				"gas_price", gp,
-				"value", value)
+			config.Logger.Error(fmt.Sprintf("Failed to estimate gas for airdrop: %v (from=%s, to=%s)", err, from, to))
 			return err
 		}
 		tx2 := types.NewTransaction(nonce, to, value, gas, gp, nil)
 		signedTx, _ := types.SignTx(tx2, types.LatestSignerForChainID(chainid), config.faucet)
 		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
-			config.Logger.Error("failed to send airdrop transaction", "error", err, "to", to)
+			config.Logger.Error(fmt.Sprintf("Failed to send airdrop transaction: %v (to=%s)", err, to))
 			return err
 		}
 		tx = signedTx

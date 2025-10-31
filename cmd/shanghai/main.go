@@ -16,7 +16,7 @@ var (
 
 func main() {
 	// Setup consistent logging
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	handler := txfuzz.NewCompactHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	slog.SetDefault(slog.New(handler))
 
 	// Store coinbase
@@ -43,7 +43,7 @@ func main() {
 	// loop push0
 	// JUMPDEST, PUSH0, JUMP
 	helper.Execute([]byte{0x58, 0x5f, 0x56}, 50000)
-	slog.Info("Limit&MeterInitcode")
+	slog.Info("Limit & Meter Initcode")
 	// limit & meter initcode
 	sizes := []int{
 		maxInitCodeSize - 2,

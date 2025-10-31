@@ -3,6 +3,7 @@ package spammer
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -21,7 +22,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 	sender := crypto.PubkeyToAddress(key.PublicKey)
 	chainID, err := backend.ChainID(context.Background())
 	if err != nil {
-		config.Logger.Warn("failed to get chain ID, using default", "error", err, "default_chain_id", "0x01000666")
+		config.Logger.Warn(fmt.Sprintf("Failed to get chain ID, using default 0x01000666: %v", err))
 		chainID = big.NewInt(0x01000666)
 	}
 
@@ -51,7 +52,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 
 		tx, err := txfuzz.RandomAuthTx(config.backend, f, sender, nonce, nil, nil, config.accessList, []types.SetCodeAuthorization{auth})
 		if err != nil {
-			config.Logger.Warn("failed to create valid EIP-7702 transaction", "error", err, "nonce", nonce)
+			config.Logger.Warn(fmt.Sprintf("Failed to create valid EIP-7702 transaction (nonce=%d): %v", nonce, err))
 			return err
 		}
 		signedTx, err := types.SignTx(tx, types.NewPragueSigner(chainID), key)
@@ -59,7 +60,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 			return err
 		}
 		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
-			config.Logger.Warn("failed to submit EIP-7702 transaction", "error", err)
+			config.Logger.Warn(fmt.Sprintf("Failed to submit EIP-7702 transaction: %v", err))
 			return err
 		}
 		lastTx = signedTx
@@ -69,7 +70,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 		ctx, cancel := context.WithTimeout(context.Background(), TX_TIMEOUT)
 		defer cancel()
 		if _, err := bind.WaitMined(ctx, backend, lastTx); err != nil {
-			config.Logger.Warn("waiting for EIP-7702 transactions to be mined failed", "error", err)
+			config.Logger.Warn(fmt.Sprintf("Waiting for EIP-7702 transactions to be mined failed: %v", err))
 		}
 	}
 	return nil

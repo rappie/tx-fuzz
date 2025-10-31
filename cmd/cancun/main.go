@@ -17,20 +17,20 @@ import (
 
 func main() {
 	// Setup consistent logging
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	handler := txfuzz.NewCompactHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	slog.SetDefault(slog.New(handler))
 
-	slog.Info("4788")
+	slog.Info("EIP-4788")
 	test4788()
-	slog.Info("1153")
+	slog.Info("EIP-1153")
 	test1153()
-	slog.Info("7516")
+	slog.Info("EIP-7516")
 	test7516()
-	slog.Info("5656")
+	slog.Info("EIP-5656")
 	test5656()
-	slog.Info("4844_prec")
+	slog.Info("EIP-4844 precompile")
 	test4844_precompile()
-	slog.Info("4844")
+	slog.Info("EIP-4844")
 	test4844()
 }
 

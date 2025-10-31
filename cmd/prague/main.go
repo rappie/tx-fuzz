@@ -22,7 +22,7 @@ import (
 
 func main() {
 	// Setup consistent logging
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	handler := txfuzz.NewCompactHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	slog.SetDefault(slog.New(handler))
 
 	testTouchContracts()
@@ -117,7 +117,7 @@ func test2537() {
 
 // test7002 creates withdrawal requests in the EIP-7002 queue.
 func test7002() {
-	slog.Info("test7002")
+	slog.Info("Test 7002")
 
 	cl, _ := helper.GetRealBackend()
 	backend := ethclient.NewClient(cl)
@@ -151,7 +151,7 @@ func test7002() {
 
 // test7251 creates consolidation requests in the EIP-7251 queue.
 func test7251() {
-	slog.Info("test7251")
+	slog.Info("Test 7251")
 	contract := common.HexToAddress("0x01aBEa29659e5e97C95107F20bb753cD3e09bBBb")
 	inputs := [][]byte{
 		// input data is source_blskey(48) || target_blskey(48)

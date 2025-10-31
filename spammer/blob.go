@@ -3,6 +3,7 @@ package spammer
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -19,7 +20,7 @@ func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 	sender := crypto.PubkeyToAddress(key.PublicKey)
 	chainID, err := backend.ChainID(context.Background())
 	if err != nil {
-		config.Logger.Warn("failed to get chain ID, using default", "error", err, "default_chain_id", "0x01000666")
+		config.Logger.Warn(fmt.Sprintf("Failed to get chain ID, using default 0x01000666: %v", err))
 		chainID = big.NewInt(0x01000666)
 	}
 
@@ -31,7 +32,7 @@ func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 		}
 		tx, err := txfuzz.RandomBlobTx(config.backend, f, sender, nonce, nil, nil, config.accessList)
 		if err != nil {
-			config.Logger.Warn("failed to create valid blob transaction", "error", err, "nonce", nonce)
+			config.Logger.Warn(fmt.Sprintf("Failed to create valid blob transaction (nonce=%d): %v", nonce, err))
 			return err
 		}
 		signedTx, err := types.SignTx(tx, types.NewCancunSigner(chainID), key)
@@ -39,7 +40,7 @@ func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 			return err
 		}
 		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
-			config.Logger.Warn("failed to submit blob transaction", "error", err)
+			config.Logger.Warn(fmt.Sprintf("Failed to submit blob transaction: %v", err))
 			return err
 		}
 		lastTx = signedTx
@@ -50,7 +51,7 @@ func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 		ctx, cancel := context.WithTimeout(context.Background(), TX_TIMEOUT)
 		defer cancel()
 		if _, err := bind.WaitMined(ctx, backend, lastTx); err != nil {
-			config.Logger.Warn("waiting for blob transactions to be mined failed", "error", err)
+			config.Logger.Warn(fmt.Sprintf("Waiting for blob transactions to be mined failed: %v", err))
 		}
 	}
 	return nil
