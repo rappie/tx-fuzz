@@ -3,7 +3,6 @@ package spammer
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/holiman/uint256"
 )
 
@@ -23,7 +21,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 	sender := crypto.PubkeyToAddress(key.PublicKey)
 	chainID, err := backend.ChainID(context.Background())
 	if err != nil {
-		log.Warn("Could not get chainID, using default")
+		config.Logger.Warn("failed to get chain ID, using default", "error", err, "default_chain_id", "0x01000666")
 		chainID = big.NewInt(0x01000666)
 	}
 
@@ -53,7 +51,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 
 		tx, err := txfuzz.RandomAuthTx(config.backend, f, sender, nonce, nil, nil, config.accessList, []types.SetCodeAuthorization{auth})
 		if err != nil {
-			fmt.Printf("Could not create valid tx: %v", nonce)
+			config.Logger.Warn("failed to create valid EIP-7702 transaction", "error", err, "nonce", nonce)
 			return err
 		}
 		signedTx, err := types.SignTx(tx, types.NewPragueSigner(chainID), key)
@@ -61,7 +59,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 			return err
 		}
 		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
-			fmt.Printf("Could not submit transaction: %v", err)
+			config.Logger.Warn("failed to submit EIP-7702 transaction", "error", err)
 			return err
 		}
 		lastTx = signedTx
@@ -71,7 +69,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 		ctx, cancel := context.WithTimeout(context.Background(), TX_TIMEOUT)
 		defer cancel()
 		if _, err := bind.WaitMined(ctx, backend, lastTx); err != nil {
-			fmt.Printf("Waiting for transactions to be mined failed: %v\n", err.Error())
+			config.Logger.Warn("waiting for EIP-7702 transactions to be mined failed", "error", err)
 		}
 	}
 	return nil

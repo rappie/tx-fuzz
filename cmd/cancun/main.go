@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/MariusVanDerWijden/tx-fuzz/helper"
@@ -14,17 +16,21 @@ import (
 )
 
 func main() {
-	fmt.Println("4788")
+	// Setup consistent logging
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	slog.SetDefault(slog.New(handler))
+
+	slog.Info("4788")
 	test4788()
-	fmt.Println("1153")
+	slog.Info("1153")
 	test1153()
-	fmt.Println("7516")
+	slog.Info("7516")
 	test7516()
-	fmt.Println("5656")
+	slog.Info("5656")
 	test5656()
-	fmt.Println("4844_prec")
+	slog.Info("4844_prec")
 	test4844_precompile()
-	fmt.Println("4844")
+	slog.Info("4844")
 	test4844()
 }
 

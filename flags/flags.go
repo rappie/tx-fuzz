@@ -56,6 +56,13 @@ var (
 		Value: 12,
 	}
 
+	LogLevelFlag = &cli.StringFlag{
+		Name:    "log-level",
+		Aliases: []string{"l"},
+		Usage:   "Set log level (debug, info, warn, error)",
+		Value:   "info",
+	}
+
 	SpamFlags = []cli.Flag{
 		SkFlag,
 		SeedFlag,
@@ -66,5 +73,6 @@ var (
 		CountFlag,
 		GasLimitFlag,
 		SlotTimeFlag,
+		LogLevelFlag,
 	}
 )

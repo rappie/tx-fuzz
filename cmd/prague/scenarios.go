@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 var nonceOffset = 0
 
 func test7702NormalTxs() {
-	fmt.Println("test 7702 normal txs scenario")
+	slog.Info("test 7702 normal txs scenario")
 	var (
 		NumKeys = 512
 		numTxs  = 16
@@ -51,7 +52,7 @@ func test7702NormalTxs() {
 }
 
 func test7702BlobTxs() {
-	fmt.Println("test 7702 blob txs scenario")
+	slog.Info("test 7702 blob txs scenario")
 	var (
 		NumKeys = 128
 		value   = new(big.Int).Lsh(big.NewInt(1), 63)
@@ -83,7 +84,7 @@ func test7702Scenario(keys []*ecdsa.PrivateKey, value *big.Int, sendTxs func(key
 	backend, sk := helper.GetRealBackend()
 	config := spammer.NewPartialConfig(backend, sk, keys)
 
-	fmt.Println("Deploying contracts")
+	slog.Info("Deploying contracts")
 	// Deploy the Callee contract
 	calleeAddr, err := deploy7702Callee(crypto.PubkeyToAddress(sk.PublicKey).Hex())
 	if err != nil {
@@ -97,21 +98,21 @@ func test7702Scenario(keys []*ecdsa.PrivateKey, value *big.Int, sendTxs func(key
 	}
 
 	// Create the authorizations
-	fmt.Println("Creating authorizations")
+	slog.Info("Creating authorizations")
 
 	// Airdrop the addresses
-	fmt.Println("Airdropping")
+	slog.Info("Airdropping")
 	if err := spammer.Airdrop(config, value); err != nil {
 		panic(err)
 	}
 
 	// Send transactions from the accounts
-	fmt.Println("Sending transactions")
+	slog.Info("Sending transactions")
 	sendTxs(keys)
 	// Send an auth that invalidates the transactions
 	var callsPerTx = min(len(keys), 128)
 	var lastTx *types.Transaction
-	fmt.Println("Invalidating transactions")
+	slog.Info("Invalidating transactions")
 	start := time.Now()
 	nonce := helper.Nonce(crypto.PubkeyToAddress(sk.PublicKey))
 	for i := range len(keys) / callsPerTx {

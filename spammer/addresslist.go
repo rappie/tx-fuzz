@@ -3,7 +3,6 @@ package spammer
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -157,17 +156,17 @@ func CreateAddressesRaw(N int) []*ecdsa.PrivateKey {
 func Airdrop(config *Config, value *big.Int) error {
 	backend := ethclient.NewClient(config.backend)
 	sender := crypto.PubkeyToAddress(config.faucet.PublicKey)
-	fmt.Printf("Airdrop faucet is at %x\n", sender)
+	config.Logger.Info("starting airdrop", "faucet", sender)
 	var tx *types.Transaction
 	chainid, err := backend.ChainID(context.Background())
 	if err != nil {
-		fmt.Printf("error getting chain ID; could not airdrop: %v\n", err)
+		config.Logger.Error("failed to get chain ID for airdrop", "error", err)
 		return err
 	}
 	for _, addr := range config.keys {
 		nonce, err := backend.PendingNonceAt(context.Background(), sender)
 		if err != nil {
-			fmt.Printf("error getting pending nonce; could not airdrop: %v\n", err)
+			config.Logger.Error("failed to get pending nonce for airdrop", "error", err)
 			return err
 		}
 		to := crypto.PubkeyToAddress(addr.PublicKey)
@@ -180,14 +179,20 @@ func Airdrop(config *Config, value *big.Int) error {
 			Value:    value,
 		})
 		if err != nil {
-			fmt.Printf("error estimating gas: %v\n", err)
-			fmt.Printf("estimating: from %v, to %v, gas %v, gasprice %v value %v", crypto.PubkeyToAddress(config.faucet.PublicKey), &to, 30_000_000, gp, value)
+			from := crypto.PubkeyToAddress(config.faucet.PublicKey)
+			config.Logger.Error("failed to estimate gas for airdrop",
+				"error", err,
+				"from", from,
+				"to", to,
+				"gas", 30_000_000,
+				"gas_price", gp,
+				"value", value)
 			return err
 		}
 		tx2 := types.NewTransaction(nonce, to, value, gas, gp, nil)
 		signedTx, _ := types.SignTx(tx2, types.LatestSignerForChainID(chainid), config.faucet)
 		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
-			fmt.Printf("error sending transaction; could not airdrop: %v\n", err)
+			config.Logger.Error("failed to send airdrop transaction", "error", err, "to", to)
 			return err
 		}
 		tx = signedTx

@@ -6,6 +6,7 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"os"
 
@@ -21,6 +22,7 @@ import (
 
 type Config struct {
 	backend *rpc.Client // connection to the rpc provider
+	Logger  *slog.Logger // structured logger
 
 	N          uint64              // number of transactions send per account
 	faucet     *ecdsa.PrivateKey   // private key of the faucet account
@@ -69,6 +71,27 @@ func NewPartialConfig(backend *rpc.Client, faucet *ecdsa.PrivateKey, keys []*ecd
 }
 
 func NewConfigFromContext(c *cli.Context) (*Config, error) {
+	// Setup logger first so we can use it throughout
+	logLevelStr := c.String(flags.LogLevelFlag.Name)
+	var logLevel slog.Level
+	switch logLevelStr {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "info":
+		logLevel = slog.LevelInfo
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	default:
+		logLevel = slog.LevelInfo
+	}
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
+	logger := slog.New(handler)
+
+	// Set as default logger so all slog calls use the same format
+	slog.SetDefault(logger)
+
 	// Setup RPC
 	rpcAddr := c.String(flags.RpcFlag.Name)
 	backend, err := rpc.Dial(rpcAddr)
@@ -89,7 +112,7 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 	var keys []*ecdsa.PrivateKey
 	nKeys := c.Int(flags.CountFlag.Name)
 	if nKeys == 0 || nKeys > len(staticKeys) {
-		fmt.Printf("Sanitizing count flag from %v to %v\n", nKeys, len(staticKeys))
+		logger.Debug("sanitizing count flag", "from", nKeys, "to", len(staticKeys))
 		nKeys = len(staticKeys)
 	}
 	for i := 0; i < nKeys; i++ {
@@ -116,7 +139,7 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 		rnd := make([]byte, 8)
 		crand.Read(rnd)
 		seed = int64(binary.BigEndian.Uint64(rnd))
-		fmt.Printf("No seed provided, creating one: %x\n", seed)
+		logger.Debug("no seed provided, creating random seed", "seed", fmt.Sprintf("0x%x", seed))
 	}
 
 	// Setup Mutator
@@ -133,6 +156,7 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 
 	return &Config{
 		backend:    backend,
+		Logger:     logger,
 		N:          uint64(N),
 		faucet:     faucet,
 		accessList: !c.Bool(flags.NoALFlag.Name),

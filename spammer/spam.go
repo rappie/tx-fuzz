@@ -12,7 +12,10 @@ import (
 type Spam func(*Config, *ecdsa.PrivateKey, *filler.Filler) error
 
 func SpamTransactions(config *Config, fun Spam) error {
-	fmt.Printf("Spamming %v transactions per account on %v accounts with seed: 0x%x\n", config.N, len(config.keys), config.seed)
+	config.Logger.Info("starting transaction spam",
+		"transactions_per_account", config.N,
+		"accounts", len(config.keys),
+		"seed", fmt.Sprintf("0x%x", config.seed))
 
 	errCh := make(chan error, len(config.keys))
 	var wg sync.WaitGroup
