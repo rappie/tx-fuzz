@@ -85,7 +85,7 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 			Data:      code,
 		})
 		if err == nil {
-			fmt.Printf("Error estimating gas: %v", err)
+			fmt.Printf("Successfully estimated gas: %v\n", gas)
 			gasCost = gas
 		}
 	}
