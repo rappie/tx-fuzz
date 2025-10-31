@@ -38,7 +38,7 @@ func SpamTransactions(config *Config, fun Spam) error {
 		// Start a fuzzing thread
 		go func(key *ecdsa.PrivateKey, filler *filler.Filler) {
 			defer wg.Done()
-			errCh <- fun(config, key, f)
+			errCh <- fun(config, key, filler)
 		}(key, f)
 	}
 	wg.Wait()
