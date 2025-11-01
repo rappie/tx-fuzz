@@ -166,7 +166,7 @@ func Airdrop(config *Config, value *big.Int) error {
 		return err
 	}
 	for _, addr := range config.keys {
-		nonce, err := backend.PendingNonceAt(context.Background(), sender)
+		nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 		if err != nil {
 			config.Logger.Error(fmt.Sprintf("Failed to get pending nonce for airdrop: %v", err))
 			return err

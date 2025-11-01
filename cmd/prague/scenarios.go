@@ -39,7 +39,7 @@ func test7702NormalTxs() {
 		backend := ethclient.NewClient(cl)
 		for _, key := range keys {
 			sender := crypto.PubkeyToAddress(key.PublicKey)
-			nonce, err := backend.PendingNonceAt(context.Background(), sender)
+			nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 			if err != nil {
 				panic(err)
 			}
@@ -66,7 +66,7 @@ func test7702BlobTxs() {
 		backend := ethclient.NewClient(cl)
 		for _, key := range keys {
 			sender := crypto.PubkeyToAddress(key.PublicKey)
-			nonce, err := backend.PendingNonceAt(context.Background(), sender)
+			nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 			if err != nil {
 				panic(err)
 			}

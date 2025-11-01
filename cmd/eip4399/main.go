@@ -21,7 +21,7 @@ func main() {
 	cl, sk := helper.GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := common.HexToAddress(txfuzz.ADDR)
-	nonce, err := backend.PendingNonceAt(context.Background(), sender)
+	nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 	if err != nil {
 		panic(err)
 	}

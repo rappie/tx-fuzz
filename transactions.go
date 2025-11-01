@@ -113,6 +113,16 @@ func SendTransaction(ctx context.Context, backend *ethclient.Client, tx *types.T
 	return nil
 }
 
+// GetPendingNonce gets the pending nonce for an address with debug logging.
+func GetPendingNonce(ctx context.Context, backend *ethclient.Client, sender common.Address) (uint64, error) {
+	nonce, err := backend.PendingNonceAt(ctx, sender)
+	if err != nil {
+		return 0, err
+	}
+	slog.Debug(fmt.Sprintf("Got pending nonce: %d (sender=%s)", nonce, sender.Hex()))
+	return nonce, nil
+}
+
 func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, gasMultiplier float64) *txConf {
 	// defaults
 	gasCost := uint64(100000)

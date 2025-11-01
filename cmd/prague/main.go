@@ -205,7 +205,7 @@ func makeTxWithValue(addr common.Address, value *big.Int, data []byte) *types.Tr
 	cl, sk := helper.GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := common.HexToAddress(txfuzz.ADDR)
-	nonce, err := backend.PendingNonceAt(ctx, sender)
+	nonce, err := txfuzz.GetPendingNonce(ctx, backend, sender)
 	if err != nil {
 		panic(err)
 	}

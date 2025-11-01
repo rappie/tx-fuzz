@@ -32,7 +32,7 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 	cl, _ := GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
-	nonce, err := backend.PendingNonceAt(context.Background(), sender)
+	nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +86,7 @@ func ExecAuth(addr common.Address, data []byte, authList []types.SetCodeAuthoriz
 	cl, sk := GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
-	nonce, err := backend.PendingNonceAt(context.Background(), sender)
+	nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 	if err != nil {
 		panic(err)
 	}
@@ -171,7 +171,7 @@ func Deploy(bytecode string) (common.Address, error) {
 	cl, sk := GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := common.HexToAddress(txfuzz.ADDR)
-	nonce, err := backend.PendingNonceAt(context.Background(), sender)
+	nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -193,7 +193,7 @@ func Execute(data []byte, gaslimit uint64) error {
 	cl, sk := GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
-	nonce, err := backend.PendingNonceAt(context.Background(), sender)
+	nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 	if err != nil {
 		panic(err)
 	}

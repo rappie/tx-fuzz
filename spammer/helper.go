@@ -115,7 +115,7 @@ func isStuck(config *Config, account common.Address) (uint64, error) {
 		return 0, err
 	}
 
-	pendingNonce, err := client.PendingNonceAt(context.Background(), account)
+	pendingNonce, err := txfuzz.GetPendingNonce(context.Background(), client, account)
 	if err != nil {
 		return 0, err
 	}
