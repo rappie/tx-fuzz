@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/binary"
-	"fmt"
 	"log/slog"
 	"os"
 
+	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/MariusVanDerWijden/tx-fuzz/helper"
 )
 

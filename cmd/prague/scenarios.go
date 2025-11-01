@@ -205,12 +205,7 @@ func ExecWithSK(backend *ethclient.Client, sk *ecdsa.PrivateKey, addr common.Add
 		AccessList:    make(types.AccessList, 0),
 		BlobGasFeeCap: big.NewInt(1_000_000),
 	}
-	if gas, err := backend.EstimateGas(context.Background(), msg); err != nil {
-		msg.Gas = uint64(5_000_000)
-		slog.Warn(fmt.Sprintf("Error estimating gas, defaulting to %d gas: %v", msg.Gas, err))
-	} else {
-		msg.Gas = gas
-	}
+	msg.Gas = txfuzz.EstimateGas(backend, msg, 5_000_000, 1.0)
 
 	var signedTx *types.Transaction
 	if blobs {

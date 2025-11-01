@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"time"
 
+	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -34,14 +35,14 @@ func sendTxWithNonce(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.
 		return nil, err
 	}
 	gp, _ := backend.SuggestGasPrice(context.Background())
-	gas, _ := backend.EstimateGas(context.Background(), ethereum.CallMsg{
+	gas := txfuzz.EstimateGas(backend, ethereum.CallMsg{
 		From:     crypto.PubkeyToAddress(sk.PublicKey),
 		To:       &to,
 		Gas:      30_000_000,
 		GasPrice: gp,
 		Value:    value,
 		Data:     nil,
-	})
+	}, 30_000, 1.0)
 	tx := types.NewTransaction(nonce, to, value, gas, gp.Mul(gp, big.NewInt(100)), nil)
 	signedTx, _ := types.SignTx(tx, types.NewEIP155Signer(chainid), sk)
 	return signedTx, backend.SendTransaction(context.Background(), signedTx)

@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -172,18 +173,13 @@ func Airdrop(config *Config, value *big.Int) error {
 		}
 		to := crypto.PubkeyToAddress(addr.PublicKey)
 		gp, _ := backend.SuggestGasPrice(context.Background())
-		gas, err := backend.EstimateGas(context.Background(), ethereum.CallMsg{
+		gas := txfuzz.EstimateGas(backend, ethereum.CallMsg{
 			From:     crypto.PubkeyToAddress(config.faucet.PublicKey),
 			To:       &to,
 			Gas:      30_000_000,
 			GasPrice: gp,
 			Value:    value,
-		})
-		if err != nil {
-			from := crypto.PubkeyToAddress(config.faucet.PublicKey)
-			config.Logger.Error(fmt.Sprintf("Failed to estimate gas for airdrop: %v (from=%s, to=%s)", err, from, to))
-			return err
-		}
+		}, 30_000, 1.0)
 		tx2 := types.NewTransaction(nonce, to, value, gas, gp, nil)
 		signedTx, _ := types.SignTx(tx2, types.LatestSignerForChainID(chainid), config.faucet)
 		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {

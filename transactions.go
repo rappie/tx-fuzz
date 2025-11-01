@@ -46,6 +46,24 @@ type txConf struct {
 	code     []byte
 }
 
+// EstimateGas estimates gas for a transaction with optional multiplier and fallback default.
+// If estimation fails, it logs a warning and returns defaultGas.
+// If estimation succeeds, it applies the multiplier and returns the adjusted value.
+func EstimateGas(backend *ethclient.Client, msg ethereum.CallMsg, defaultGas uint64, multiplier float64) uint64 {
+	gas, err := backend.EstimateGas(context.Background(), msg)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("Failed to estimate gas, using default %d: %v", defaultGas, err))
+		return defaultGas
+	}
+
+	// Apply multiplier
+	adjustedGas := uint64(float64(gas) * multiplier)
+	if multiplier != 1.0 {
+		slog.Debug(fmt.Sprintf("Estimated gas: %d, adjusted: %d (multiplier: %.2f)", gas, adjustedGas, multiplier))
+	}
+	return adjustedGas
+}
+
 func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int) *txConf {
 	// defaults
 	gasCost := uint64(100000)
@@ -74,7 +92,7 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 			}
 		}
 		// Try to estimate gas
-		gas, err := client.EstimateGas(context.Background(), ethereum.CallMsg{
+		gasCost = EstimateGas(client, ethereum.CallMsg{
 			From:      sender,
 			To:        &to,
 			Gas:       30_000_000,
@@ -83,11 +101,7 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 			GasTipCap: gasPrice,
 			Value:     value,
 			Data:      code,
-		})
-		if err == nil {
-			slog.Info(fmt.Sprintf("Successfully estimated gas: %d", gas))
-			gasCost = gas
-		}
+		}, gasCost, 1.0)
 	}
 
 	return &txConf{
