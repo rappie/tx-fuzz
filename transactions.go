@@ -31,7 +31,7 @@ func RandomTx(f *filler.Filler) (*types.Transaction, error) {
 	nonce := uint64(rand.Int63())
 	gasPrice := big.NewInt(rand.Int63())
 	chainID := big.NewInt(rand.Int63())
-	return RandomValidTx(nil, f, common.Address{}, nonce, gasPrice, chainID, false)
+	return RandomValidTx(nil, f, common.Address{}, nonce, gasPrice, chainID, false, 1.0)
 }
 
 type txConf struct {
@@ -64,7 +64,7 @@ func EstimateGas(backend *ethclient.Client, msg ethereum.CallMsg, defaultGas uin
 	return adjustedGas
 }
 
-func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int) *txConf {
+func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, gasMultiplier float64) *txConf {
 	// defaults
 	gasCost := uint64(100000)
 	to := randomAddress()
@@ -101,7 +101,7 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 			GasTipCap: gasPrice,
 			Value:     value,
 			Data:      code,
-		}, gasCost, 1.0)
+		}, gasCost, gasMultiplier)
 	}
 
 	return &txConf{
@@ -121,8 +121,8 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 // It does not mean that the transaction will succeed, but that it is well-formed.
 // If gasPrice is not set, we will try to get it from the rpc
 // If chainID is not set, we will try to get it from the rpc
-func RandomValidTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool) (*types.Transaction, error) {
-	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID)
+func RandomValidTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool, gasMultiplier float64) (*types.Transaction, error) {
+	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID, gasMultiplier)
 	var index int
 	if al {
 		index = rand.Intn(len(alStrategies))
@@ -133,8 +133,8 @@ func RandomValidTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, non
 	}
 }
 
-func RandomBlobTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool) (*types.Transaction, error) {
-	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID)
+func RandomBlobTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool, gasMultiplier float64) (*types.Transaction, error) {
+	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID, gasMultiplier)
 	if al {
 		return fullAlBlobTx(conf)
 	} else {
@@ -142,8 +142,8 @@ func RandomBlobTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonc
 	}
 }
 
-func RandomAuthTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool, aList []types.SetCodeAuthorization) (*types.Transaction, error) {
-	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID)
+func RandomAuthTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool, aList []types.SetCodeAuthorization, gasMultiplier float64) (*types.Transaction, error) {
+	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID, gasMultiplier)
 	tx := types.NewTransaction(conf.nonce, *conf.to, conf.value, conf.gasLimit, conf.gasPrice, conf.code)
 	var list types.AccessList
 	if al {

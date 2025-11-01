@@ -30,7 +30,7 @@ func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 		if err != nil {
 			return err
 		}
-		tx, err := txfuzz.RandomBlobTx(config.backend, f, sender, nonce, nil, nil, config.accessList)
+		tx, err := txfuzz.RandomBlobTx(config.backend, f, sender, nonce, nil, nil, config.accessList, config.GasMultiplier)
 		if err != nil {
 			config.Logger.Warn(fmt.Sprintf("Failed to create valid blob transaction (nonce=%d): %v", nonce, err))
 			return err

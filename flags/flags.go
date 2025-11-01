@@ -63,6 +63,12 @@ var (
 		Value:   "info",
 	}
 
+	GasMultiplierFlag = &cli.Float64Flag{
+		Name:  "gas-multiplier",
+		Usage: "Multiplier for gas estimation (e.g., 1.2 for 20% buffer)",
+		Value: 1.0,
+	}
+
 	SpamFlags = []cli.Flag{
 		SkFlag,
 		SeedFlag,
@@ -74,5 +80,6 @@ var (
 		GasLimitFlag,
 		SlotTimeFlag,
 		LogLevelFlag,
+		GasMultiplierFlag,
 	}
 )

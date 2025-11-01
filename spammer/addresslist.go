@@ -179,7 +179,7 @@ func Airdrop(config *Config, value *big.Int) error {
 			Gas:      30_000_000,
 			GasPrice: gp,
 			Value:    value,
-		}, 30_000, 1.0)
+		}, 30_000, config.GasMultiplier)
 		tx2 := types.NewTransaction(nonce, to, value, gas, gp, nil)
 		signedTx, _ := types.SignTx(tx2, types.LatestSignerForChainID(chainid), config.faucet)
 		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {

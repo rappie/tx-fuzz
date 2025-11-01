@@ -20,16 +20,16 @@ import (
 
 const batchSize = 50
 
-func SendTx(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int) (*types.Transaction, error) {
+func SendTx(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int) (*types.Transaction, error) {
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
 	nonce, err := backend.NonceAt(context.Background(), sender, nil)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("Failed to get pending nonce: %v (sender=%s)", err, sender))
 	}
-	return sendTxWithNonce(sk, backend, to, value, nonce)
+	return sendTxWithNonce(config, sk, backend, to, value, nonce)
 }
 
-func sendTxWithNonce(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, nonce uint64) (*types.Transaction, error) {
+func sendTxWithNonce(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, nonce uint64) (*types.Transaction, error) {
 	chainid, err := backend.ChainID(context.Background())
 	if err != nil {
 		return nil, err
@@ -42,13 +42,13 @@ func sendTxWithNonce(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.
 		GasPrice: gp,
 		Value:    value,
 		Data:     nil,
-	}, 30_000, 1.0)
+	}, 30_000, config.GasMultiplier)
 	tx := types.NewTransaction(nonce, to, value, gas, gp.Mul(gp, big.NewInt(100)), nil)
 	signedTx, _ := types.SignTx(tx, types.NewEIP155Signer(chainid), sk)
 	return signedTx, backend.SendTransaction(context.Background(), signedTx)
 }
 
-func sendRecurringTx(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, numTxs uint64) (*types.Transaction, error) {
+func sendRecurringTx(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, numTxs uint64) (*types.Transaction, error) {
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
 	nonce, err := backend.NonceAt(context.Background(), sender, nil)
 	if err != nil {
@@ -58,7 +58,7 @@ func sendRecurringTx(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.
 		tx *types.Transaction
 	)
 	for i := 0; i < int(numTxs); i++ {
-		tx, err = sendTxWithNonce(sk, backend, to, value, nonce+uint64(i))
+		tx, err = sendTxWithNonce(config, sk, backend, to, value, nonce+uint64(i))
 	}
 	return tx, err
 }
@@ -94,7 +94,7 @@ func tryUnstuck(config *Config, sk *ecdsa.PrivateKey) error {
 			noTx = batchSize
 		}
 		config.Logger.Info(fmt.Sprintf("Sending %d transactions to unstuck account %s", noTx, addr))
-		tx, err := sendRecurringTx(sk, client, addr, big.NewInt(1), noTx)
+		tx, err := sendRecurringTx(config, sk, client, addr, big.NewInt(1), noTx)
 		if err != nil {
 			return err
 		}

@@ -50,7 +50,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 			return err
 		}
 
-		tx, err := txfuzz.RandomAuthTx(config.backend, f, sender, nonce, nil, nil, config.accessList, []types.SetCodeAuthorization{auth})
+		tx, err := txfuzz.RandomAuthTx(config.backend, f, sender, nonce, nil, nil, config.accessList, []types.SetCodeAuthorization{auth}, config.GasMultiplier)
 		if err != nil {
 			config.Logger.Warn(fmt.Sprintf("Failed to create valid EIP-7702 transaction (nonce=%d): %v", nonce, err))
 			return err
