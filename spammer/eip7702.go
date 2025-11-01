@@ -59,8 +59,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 		if err != nil {
 			return err
 		}
-		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
-			config.Logger.Warn(fmt.Sprintf("Failed to submit EIP-7702 transaction: %v", err))
+		if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
 			return err
 		}
 		lastTx = signedTx

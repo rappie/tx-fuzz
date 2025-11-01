@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -77,13 +76,8 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 		signedTx, _ = types.SignTx(tx, types.NewCancunSigner(chainid), sk)
 	}
 
-	rlpData, err := signedTx.MarshalBinary()
-	if err != nil {
+	if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
 		panic(err)
-	}
-
-	if err := cl.CallContext(context.Background(), nil, "eth_sendRawTransaction", hexutil.Encode(rlpData)); err != nil {
-		slog.Warn(fmt.Sprintf("Transaction failed: %v", err))
 	}
 	return signedTx
 }
@@ -115,8 +109,6 @@ func ExecAuthWithNonce(addr common.Address, nonce uint64, data []byte, authList 
 	if err != nil {
 		panic(err)
 	}
-	var rlpData []byte
-	var _tx *types.Transaction
 	gasLimit := uint64(5_000_000)
 	if authList == nil {
 		buf := make([]byte, 1024)
@@ -129,15 +121,10 @@ func ExecAuthWithNonce(addr common.Address, nonce uint64, data []byte, authList 
 	}
 	tx := txfuzz.New7702Tx(nonce, addr, gasLimit, chainid, tip.Mul(tip, big.NewInt(100)), gp.Mul(gp, big.NewInt(100)), common.Big0, data, big.NewInt(1_000_000), make(types.AccessList, 0), authList)
 	signedTx, _ := types.SignTx(tx, types.NewPragueSigner(chainid), sk)
-	rlpData, err = signedTx.MarshalBinary()
-	if err != nil {
+	if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
 		panic(err)
 	}
-	_tx = signedTx
-	if err := cl.CallContext(context.Background(), nil, "eth_sendRawTransaction", hexutil.Encode(rlpData)); err != nil {
-		slog.Warn(fmt.Sprintf("Transaction failed: %v", err))
-	}
-	return _tx
+	return signedTx
 }
 
 func GetRealBackend() (*rpc.Client, *ecdsa.PrivateKey) {
@@ -196,7 +183,7 @@ func Deploy(bytecode string) (common.Address, error) {
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	tx := types.NewContractCreation(nonce, common.Big0, 5_000_000, gp.Mul(gp, common.Big2), common.Hex2Bytes(bytecode))
 	signedTx, _ := types.SignTx(tx, types.NewCancunSigner(chainid), sk)
-	if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
+	if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
 		return common.Address{}, err
 	}
 	return bind.WaitDeployed(context.Background(), backend, signedTx)
@@ -218,7 +205,7 @@ func Execute(data []byte, gaslimit uint64) error {
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	tx := types.NewContractCreation(nonce, common.Big1, gaslimit, gp.Mul(gp, common.Big2), data)
 	signedTx, _ := types.SignTx(tx, types.NewLondonSigner(chainid), sk)
-	return backend.SendTransaction(context.Background(), signedTx)
+	return txfuzz.SendTransaction(context.Background(), backend, signedTx)
 }
 
 func RandomBlobData() ([]byte, error) {

@@ -182,8 +182,7 @@ func Airdrop(config *Config, value *big.Int) error {
 		}, 30_000, config.GasMultiplier)
 		tx2 := types.NewTransaction(nonce, to, value, gas, gp, nil)
 		signedTx, _ := types.SignTx(tx2, types.LatestSignerForChainID(chainid), config.faucet)
-		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
-			config.Logger.Error(fmt.Sprintf("Failed to send airdrop transaction: %v (to=%s)", err, to))
+		if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
 			return err
 		}
 		tx = signedTx

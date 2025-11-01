@@ -64,6 +64,55 @@ func EstimateGas(backend *ethclient.Client, msg ethereum.CallMsg, defaultGas uin
 	return adjustedGas
 }
 
+// SendTransaction sends a transaction with debug logging before and after.
+func SendTransaction(ctx context.Context, backend *ethclient.Client, tx *types.Transaction) error {
+	// Extract transaction details
+	var from common.Address
+	var signer types.Signer
+
+	// Determine signer based on transaction type
+	if tx.Type() == types.BlobTxType || tx.Type() == types.DynamicFeeTxType {
+		signer = types.LatestSignerForChainID(tx.ChainId())
+	} else if tx.Type() == types.SetCodeTxType {
+		signer = types.NewPragueSigner(tx.ChainId())
+	} else {
+		signer = types.LatestSignerForChainID(tx.ChainId())
+	}
+
+	from, err := types.Sender(signer, tx)
+	if err != nil {
+		from = common.Address{} // Use zero address if we can't recover sender
+	}
+
+	to := "contract_creation"
+	if tx.To() != nil {
+		to = tx.To().Hex()
+	}
+
+	// Format gas price based on transaction type
+	gasPrice := "unknown"
+	if tx.GasPrice() != nil && tx.GasPrice().Sign() > 0 {
+		gasPrice = tx.GasPrice().String()
+	} else if tx.GasFeeCap() != nil {
+		gasPrice = fmt.Sprintf("tip=%s/cap=%s", tx.GasTipCap().String(), tx.GasFeeCap().String())
+	}
+
+	// Log before sending
+	slog.Debug(fmt.Sprintf("Sending transaction: from=%s to=%s nonce=%d gas=%d gasPrice=%s value=%s dataLen=%d type=%d",
+		from.Hex(), to, tx.Nonce(), tx.Gas(), gasPrice, tx.Value().String(), len(tx.Data()), tx.Type()))
+
+	// Send transaction
+	err = backend.SendTransaction(ctx, tx)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("Transaction failed: %v (from=%s to=%s nonce=%d)", err, from.Hex(), to, tx.Nonce()))
+		return err
+	}
+
+	// Log success
+	slog.Debug(fmt.Sprintf("Transaction sent: hash=%s nonce=%d", tx.Hash().Hex(), tx.Nonce()))
+	return nil
+}
+
 func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, gasMultiplier float64) *txConf {
 	// defaults
 	gasCost := uint64(100000)
