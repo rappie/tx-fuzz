@@ -75,6 +75,12 @@ var (
 		Value: 10,
 	}
 
+	NoLocalNonceFlag = &cli.BoolFlag{
+		Name:  "no-local-nonce",
+		Usage: "Disable local nonce tracking (query RPC for every transaction)",
+		Value: false,
+	}
+
 	SpamFlags = []cli.Flag{
 		SkFlag,
 		SeedFlag,
@@ -88,5 +94,6 @@ var (
 		LogLevelFlag,
 		GasMultiplierFlag,
 		TxDelayFlag,
+		NoLocalNonceFlag,
 	}
 )

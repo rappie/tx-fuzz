@@ -114,12 +114,29 @@ func SendTransaction(ctx context.Context, backend *ethclient.Client, tx *types.T
 }
 
 // GetPendingNonce gets the pending nonce for an address with debug logging.
+// If local nonce tracking is enabled, checks the cache first before querying RPC.
 func GetPendingNonce(ctx context.Context, backend *ethclient.Client, sender common.Address) (uint64, error) {
+	// Check cache first (if enabled)
+	if nonceManager != nil && nonceManager.enabled {
+		if nonce, exists := nonceManager.Get(sender); exists {
+			slog.Debug(fmt.Sprintf("Using cached nonce: %d (sender=%s)", nonce, sender.Hex()))
+			return nonce, nil
+		}
+	}
+
+	// Query network (first time or disabled)
 	nonce, err := backend.PendingNonceAt(ctx, sender)
 	if err != nil {
 		return 0, err
 	}
-	slog.Debug(fmt.Sprintf("Got pending nonce: %d (sender=%s)", nonce, sender.Hex()))
+
+	// Cache for next time (if enabled)
+	// Store the nonce as-is; Get() will increment it for subsequent calls
+	if nonceManager != nil && nonceManager.enabled {
+		nonceManager.Set(sender, nonce)
+	}
+
+	slog.Debug(fmt.Sprintf("Got pending nonce from RPC: %d (sender=%s)", nonce, sender.Hex()))
 	return nonce, nil
 }
 

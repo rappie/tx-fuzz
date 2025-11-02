@@ -51,6 +51,9 @@ func NewDefaultConfig(rpcAddr string, N uint64, accessList bool, rng *rand.Rand)
 		keys = append(keys, crypto.ToECDSAUnsafe(common.FromHex(staticKeys[i])))
 	}
 
+	// Enable local nonce tracking by default
+	txfuzz.SetNonceManager(true)
+
 	return &Config{
 		backend:       backend,
 		N:             N,
@@ -67,6 +70,9 @@ func NewDefaultConfig(rpcAddr string, N uint64, accessList bool, rng *rand.Rand)
 }
 
 func NewPartialConfig(backend *rpc.Client, faucet *ecdsa.PrivateKey, keys []*ecdsa.PrivateKey) *Config {
+	// Enable local nonce tracking by default
+	txfuzz.SetNonceManager(true)
+
 	return &Config{
 		backend:       backend,
 		faucet:        faucet,
@@ -165,6 +171,10 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 			return nil, err
 		}
 	}
+
+	// Setup local nonce tracking
+	localNonce := !c.Bool(flags.NoLocalNonceFlag.Name)
+	txfuzz.SetNonceManager(localNonce)
 
 	return &Config{
 		backend:       backend,
