@@ -105,6 +105,10 @@ func SendTransaction(ctx context.Context, backend *ethclient.Client, tx *types.T
 	err = backend.SendTransaction(ctx, tx)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("Transaction failed: %v (from=%s to=%s nonce=%d)", err, from.Hex(), to, tx.Nonce()))
+
+		// Save failed transaction if storage is enabled
+		SaveFailedTransaction(ctx, backend, tx, err)
+
 		return err
 	}
 

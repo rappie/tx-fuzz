@@ -81,6 +81,12 @@ var (
 		Value: false,
 	}
 
+	SaveFailedTxsFlag = &cli.BoolFlag{
+		Name:  "save-failed-txs",
+		Usage: "Save failed transactions to disk for later analysis",
+		Value: false,
+	}
+
 	SpamFlags = []cli.Flag{
 		SkFlag,
 		SeedFlag,
@@ -95,5 +101,6 @@ var (
 		GasMultiplierFlag,
 		TxDelayFlag,
 		NoLocalNonceFlag,
+		SaveFailedTxsFlag,
 	}
 )

@@ -54,6 +54,9 @@ func NewDefaultConfig(rpcAddr string, N uint64, accessList bool, rng *rand.Rand)
 	// Enable local nonce tracking by default
 	txfuzz.SetNonceManager(true)
 
+	// Disable failed transaction storage by default (no flag available in this constructor)
+	txfuzz.SetFailedTxStorage(false, "", "")
+
 	return &Config{
 		backend:       backend,
 		N:             N,
@@ -72,6 +75,9 @@ func NewDefaultConfig(rpcAddr string, N uint64, accessList bool, rng *rand.Rand)
 func NewPartialConfig(backend *rpc.Client, faucet *ecdsa.PrivateKey, keys []*ecdsa.PrivateKey) *Config {
 	// Enable local nonce tracking by default
 	txfuzz.SetNonceManager(true)
+
+	// Disable failed transaction storage by default (no flag available in this constructor)
+	txfuzz.SetFailedTxStorage(false, "", "")
 
 	return &Config{
 		backend:       backend,
@@ -175,6 +181,10 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 	// Setup local nonce tracking
 	localNonce := !c.Bool(flags.NoLocalNonceFlag.Name)
 	txfuzz.SetNonceManager(localNonce)
+
+	// Setup failed transaction storage
+	saveFailedTxs := c.Bool(flags.SaveFailedTxsFlag.Name)
+	txfuzz.SetFailedTxStorage(saveFailedTxs, "./failed_txs", rpcAddr)
 
 	return &Config{
 		backend:       backend,
