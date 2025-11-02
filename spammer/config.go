@@ -31,6 +31,7 @@ type Config struct {
 	accessList    bool                // whether to create accesslist transactions
 	gasLimit      uint64              // gas limit per transaction
 	GasMultiplier float64             // multiplier for gas estimation
+	TxDelay       uint64              // delay between transactions in milliseconds
 	SlotTime      uint64              // slot time in seconds
 
 	seed int64            // seed used for generating randomness
@@ -59,6 +60,7 @@ func NewDefaultConfig(rpcAddr string, N uint64, accessList bool, rng *rand.Rand)
 		accessList:    accessList,
 		gasLimit:      30_000_000,
 		GasMultiplier: 1.0,
+		TxDelay:       10,
 		seed:          0,
 		mut:           mutator.NewMutator(rng),
 	}, nil
@@ -70,6 +72,7 @@ func NewPartialConfig(backend *rpc.Client, faucet *ecdsa.PrivateKey, keys []*ecd
 		faucet:        faucet,
 		keys:          keys,
 		GasMultiplier: 1.0,
+		TxDelay:       10,
 	}
 }
 
@@ -139,6 +142,9 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 	// Setup gas multiplier
 	gasMultiplier := c.Float64(flags.GasMultiplierFlag.Name)
 
+	// Setup transaction delay
+	txDelay := c.Int(flags.TxDelayFlag.Name)
+
 	// Setup seed
 	seed := c.Int64(flags.SeedFlag.Name)
 	if seed == 0 {
@@ -168,6 +174,7 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 		accessList:    !c.Bool(flags.NoALFlag.Name),
 		gasLimit:      uint64(gasLimit),
 		GasMultiplier: gasMultiplier,
+		TxDelay:       uint64(txDelay),
 		seed:          seed,
 		keys:          keys,
 		corpus:        corpus,

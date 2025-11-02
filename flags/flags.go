@@ -69,6 +69,12 @@ var (
 		Value: 1.0,
 	}
 
+	TxDelayFlag = &cli.IntFlag{
+		Name:  "tx-delay",
+		Usage: "Delay between transactions in milliseconds",
+		Value: 10,
+	}
+
 	SpamFlags = []cli.Flag{
 		SkFlag,
 		SeedFlag,
@@ -81,5 +87,6 @@ var (
 		SlotTimeFlag,
 		LogLevelFlag,
 		GasMultiplierFlag,
+		TxDelayFlag,
 	}
 )

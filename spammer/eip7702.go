@@ -63,7 +63,7 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 			return err
 		}
 		lastTx = signedTx
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(time.Duration(config.TxDelay) * time.Millisecond)
 	}
 	if lastTx != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), TX_TIMEOUT)
