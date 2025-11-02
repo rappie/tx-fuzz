@@ -28,7 +28,8 @@ func SendBasicTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fill
 
 	var lastTx *types.Transaction
 	for i := uint64(0); i < config.N; i++ {
-		nonce, err := backend.NonceAt(context.Background(), sender, big.NewInt(-1))
+		// nonce, err := backend.NonceAt(context.Background(), sender, big.NewInt(-1))
+		nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 		if err != nil {
 			return err
 		}

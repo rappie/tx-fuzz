@@ -28,13 +28,13 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 
 	var lastTx *types.Transaction
 	for i := uint64(0); i < config.N; i++ {
-		nonce, err := backend.NonceAt(context.Background(), sender, big.NewInt(-1))
+		nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 		if err != nil {
 			return err
 		}
 
 		authorizer := config.keys[rand.Intn(len(config.keys))]
-		nonceAuth, err := backend.NonceAt(context.Background(), crypto.PubkeyToAddress(authorizer.PublicKey), big.NewInt(-1))
+		nonceAuth, err := txfuzz.GetPendingNonce(context.Background(), backend, crypto.PubkeyToAddress(authorizer.PublicKey))
 		if err != nil {
 			return err
 		}
