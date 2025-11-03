@@ -168,7 +168,11 @@ func Airdrop(config *Config, value *big.Int) error {
 			return err
 		}
 		to := crypto.PubkeyToAddress(addr.PublicKey)
-		gp, _ := backend.SuggestGasPrice(context.Background())
+		gp, err := backend.SuggestGasPrice(context.Background())
+		if err != nil {
+			config.Logger.Error(fmt.Sprintf("Failed to suggest gas price for airdrop: %v", err))
+			return err
+		}
 		gas, _ := txfuzz.EstimateGas(backend, ethereum.CallMsg{
 			From:     crypto.PubkeyToAddress(config.faucet.PublicKey),
 			To:       &to,
