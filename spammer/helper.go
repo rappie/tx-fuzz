@@ -35,7 +35,7 @@ func sendTxWithNonce(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Cl
 		return nil, err
 	}
 	gp, _ := backend.SuggestGasPrice(context.Background())
-	gas := txfuzz.EstimateGas(backend, ethereum.CallMsg{
+	gas, _ := txfuzz.EstimateGas(backend, ethereum.CallMsg{
 		From:     crypto.PubkeyToAddress(sk.PublicKey),
 		To:       &to,
 		Gas:      30_000_000,
@@ -45,7 +45,7 @@ func sendTxWithNonce(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Cl
 	}, 30_000, config.GasMultiplier)
 	tx := types.NewTransaction(nonce, to, value, gas, gp.Mul(gp, big.NewInt(100)), nil)
 	signedTx, _ := types.SignTx(tx, types.NewEIP155Signer(chainid), sk)
-	return signedTx, txfuzz.SendTransaction(context.Background(), backend, signedTx)
+	return signedTx, txfuzz.SendTransaction(context.Background(), backend, signedTx, 0, 0)
 }
 
 func sendRecurringTx(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, numTxs uint64) (*types.Transaction, error) {

@@ -173,7 +173,7 @@ func Airdrop(config *Config, value *big.Int) error {
 		}
 		to := crypto.PubkeyToAddress(addr.PublicKey)
 		gp, _ := backend.SuggestGasPrice(context.Background())
-		gas := txfuzz.EstimateGas(backend, ethereum.CallMsg{
+		gas, _ := txfuzz.EstimateGas(backend, ethereum.CallMsg{
 			From:     crypto.PubkeyToAddress(config.faucet.PublicKey),
 			To:       &to,
 			Gas:      30_000_000,
@@ -182,7 +182,7 @@ func Airdrop(config *Config, value *big.Int) error {
 		}, 30_000, config.GasMultiplier)
 		tx2 := types.NewTransaction(nonce, to, value, gas, gp, nil)
 		signedTx, _ := types.SignTx(tx2, types.LatestSignerForChainID(chainid), config.faucet)
-		if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
+		if err := txfuzz.SendTransaction(context.Background(), backend, signedTx, 0, 0); err != nil {
 			return err
 		}
 		tx = signedTx

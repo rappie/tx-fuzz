@@ -33,7 +33,7 @@ func SendBasicTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fill
 		if err != nil {
 			return err
 		}
-		tx, err := txfuzz.RandomValidTx(config.backend, f, sender, nonce, nil, nil, config.accessList, config.GasMultiplier)
+		tx, originalGasEstimate, gasMultiplier, err := txfuzz.RandomValidTx(config.backend, f, sender, nonce, nil, nil, config.accessList, config.GasMultiplier)
 		if err != nil {
 			config.Logger.Warn(fmt.Sprintf("Failed to create valid transaction (nonce=%d): %v", nonce, err))
 			return err
@@ -42,7 +42,7 @@ func SendBasicTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fill
 		if err != nil {
 			return err
 		}
-		if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
+		if err := txfuzz.SendTransaction(context.Background(), backend, signedTx, originalGasEstimate, gasMultiplier); err != nil {
 			return err
 		}
 		lastTx = signedTx
@@ -55,7 +55,7 @@ func SendBasicTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fill
 			config.Logger.Warn(fmt.Sprintf("Waiting for transactions to be mined failed: %v", err))
 
 			// Save transaction that timed out waiting to be mined
-			txfuzz.SaveFailedTransaction(context.Background(), backend, lastTx, err)
+			txfuzz.SaveFailedTransaction(context.Background(), backend, lastTx, err, 0, 0)
 		}
 	}
 	return nil

@@ -80,8 +80,9 @@ type AccountState struct {
 
 // FuzzerContext contains fuzzer-specific context
 type FuzzerContext struct {
-	Seed          string  `json:"seed,omitempty"`
-	GasMultiplier float64 `json:"gasMultiplier,omitempty"`
+	Seed                string  `json:"seed,omitempty"`
+	GasMultiplier       float64 `json:"gasMultiplier,omitempty"`
+	OriginalGasEstimate uint64  `json:"originalGasEstimate,omitempty"`
 }
 
 // FailedGasEstimationContext contains complete context about a failed gas estimation
@@ -138,7 +139,7 @@ func SetFailedTxStorage(enabled bool, baseDir string, rpcEndpoint string) {
 }
 
 // SaveFailedTransaction saves a failed transaction to disk with full context
-func SaveFailedTransaction(ctx context.Context, backend *ethclient.Client, tx *types.Transaction, err error) {
+func SaveFailedTransaction(ctx context.Context, backend *ethclient.Client, tx *types.Transaction, err error, originalGasEstimate uint64, gasMultiplier float64) {
 	if storage == nil || !storage.enabled {
 		return
 	}
@@ -163,7 +164,10 @@ func SaveFailedTransaction(ctx context.Context, backend *ethclient.Client, tx *t
 		Network:      networkState,
 		Transaction:  txInfo,
 		AccountState: accountState,
-		Fuzzer:       FuzzerContext{}, // Will be populated if we add fuzzer context tracking
+		Fuzzer: FuzzerContext{
+			GasMultiplier:       gasMultiplier,
+			OriginalGasEstimate: originalGasEstimate,
+		},
 	}
 
 	// Save to disk
