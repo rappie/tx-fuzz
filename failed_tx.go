@@ -145,7 +145,6 @@ func SaveFailedTransaction(ctx context.Context, backend *ethclient.Client, tx *t
 
 	// Capture error message immediately to avoid any potential race conditions
 	errorMessage := err.Error()
-	slog.Warn(fmt.Sprintf("Saving failed transaction: error=%s nonce=%d", errorMessage, tx.Nonce()))
 
 	// Extract transaction details
 	txInfo, sender := extractTransactionInfo(tx)
@@ -183,7 +182,6 @@ func SaveFailedGasEstimation(ctx context.Context, backend *ethclient.Client, msg
 
 	// Capture error message immediately
 	errorMessage := err.Error()
-	slog.Warn(fmt.Sprintf("Saving failed gas estimation: error=%s from=%s", errorMessage, msg.From.Hex()))
 
 	// Extract CallMsg info
 	callMsgInfo := extractCallMsgInfo(msg)
