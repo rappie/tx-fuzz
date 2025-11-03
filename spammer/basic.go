@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/MariusVanDerWijden/FuzzyVM/filler"
@@ -20,11 +19,7 @@ const TX_TIMEOUT = 5 * time.Minute
 func SendBasicTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Filler) error {
 	backend := ethclient.NewClient(config.backend)
 	sender := crypto.PubkeyToAddress(key.PublicKey)
-	chainID, err := backend.ChainID(context.Background())
-	if err != nil {
-		config.Logger.Warn(fmt.Sprintf("Failed to get chain ID, using default 0x01000666: %v", err))
-		chainID = big.NewInt(0x01000666)
-	}
+	chainID := txfuzz.GetChainID(backend)
 
 	var lastTx *types.Transaction
 	for i := uint64(0); i < config.N; i++ {

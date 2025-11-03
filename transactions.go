@@ -20,6 +20,29 @@ import (
 	"github.com/holiman/uint256"
 )
 
+// Global chain ID management
+var globalChainID *big.Int
+
+// SetChainID sets a global chain ID to use for all transactions
+func SetChainID(chainID *big.Int) {
+	globalChainID = chainID
+}
+
+// GetChainID returns the chain ID, either from the global setting or by querying the RPC
+func GetChainID(backend *ethclient.Client) *big.Int {
+	if globalChainID != nil {
+		slog.Debug(fmt.Sprintf("Using manually set chain ID: %s", globalChainID.String()))
+		return globalChainID
+	}
+
+	chainID, err := backend.ChainID(context.Background())
+	if err != nil {
+		panic(fmt.Sprintf("Failed to get chain ID from RPC: %v", err))
+	}
+	slog.Debug(fmt.Sprintf("Got chain ID from RPC: %s", chainID.String()))
+	return chainID
+}
+
 // RandomCode creates a random byte code from the passed filler.
 func RandomCode(f *filler.Filler) []byte {
 	_, code := generator.GenerateProgram(f)
@@ -175,11 +198,7 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 			}
 		}
 		if chainID == nil {
-			chainID, err = client.ChainID(context.Background())
-			if err != nil {
-				slog.Warn(fmt.Sprintf("Failed to fetch chain ID, using default 1: %v", err))
-				chainID = big.NewInt(1)
-			}
+			chainID = GetChainID(client)
 		}
 		// Try to estimate gas
 		gasCost, originalGasEstimate = EstimateGas(client, ethereum.CallMsg{

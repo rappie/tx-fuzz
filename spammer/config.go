@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"math/rand"
 	"os"
 
@@ -185,6 +186,11 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 	// Setup failed transaction storage
 	saveFailedTxs := c.Bool(flags.SaveFailedTxsFlag.Name)
 	txfuzz.SetFailedTxStorage(saveFailedTxs, "./failed_txs", rpcAddr)
+
+	// Setup chain ID
+	if chainID := c.Uint64(flags.ChainIDFlag.Name); chainID != 0 {
+		txfuzz.SetChainID(new(big.Int).SetUint64(chainID))
+	}
 
 	return &Config{
 		backend:       backend,

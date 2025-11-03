@@ -160,11 +160,7 @@ func Airdrop(config *Config, value *big.Int) error {
 	sender := crypto.PubkeyToAddress(config.faucet.PublicKey)
 	config.Logger.Info(fmt.Sprintf("Starting airdrop from faucet %s", sender))
 	var tx *types.Transaction
-	chainid, err := backend.ChainID(context.Background())
-	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Failed to get chain ID for airdrop: %v", err))
-		return err
-	}
+	chainid := txfuzz.GetChainID(backend)
 	for _, addr := range config.keys {
 		nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 		if err != nil {

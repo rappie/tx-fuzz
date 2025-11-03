@@ -180,10 +180,7 @@ func ExecWithSK(backend *ethclient.Client, sk *ecdsa.PrivateKey, addr common.Add
 	cl, _ := helper.GetRealBackend()
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
 
-	chainid, err := backend.ChainID(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	chainid := txfuzz.GetChainID(backend)
 	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, err := backend.SuggestGasPrice(context.Background())
 	if err != nil {

@@ -30,10 +30,7 @@ func SendTx(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Client, to 
 }
 
 func sendTxWithNonce(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, nonce uint64) (*types.Transaction, error) {
-	chainid, err := backend.ChainID(context.Background())
-	if err != nil {
-		return nil, err
-	}
+	chainid := txfuzz.GetChainID(backend)
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	gas, _ := txfuzz.EstimateGas(backend, ethereum.CallMsg{
 		From:     crypto.PubkeyToAddress(sk.PublicKey),

@@ -36,10 +36,7 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 	if err != nil {
 		panic(err)
 	}
-	chainid, err := backend.ChainID(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	chainid := txfuzz.GetChainID(backend)
 	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, err := backend.SuggestGasPrice(context.Background())
 	if err != nil {
@@ -96,10 +93,7 @@ func ExecAuth(addr common.Address, data []byte, authList []types.SetCodeAuthoriz
 func ExecAuthWithNonce(addr common.Address, nonce uint64, data []byte, authList []types.SetCodeAuthorization) *types.Transaction {
 	cl, sk := GetRealBackend()
 	backend := ethclient.NewClient(cl)
-	chainid, err := backend.ChainID(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	chainid := txfuzz.GetChainID(backend)
 	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, err := backend.SuggestGasPrice(context.Background())
 	if err != nil {
@@ -150,11 +144,7 @@ func Wait(tx *types.Transaction) {
 func ChainID() *big.Int {
 	cl, _ := GetRealBackend()
 	backend := ethclient.NewClient(cl)
-	id, err := backend.ChainID(context.Background())
-	if err != nil {
-		panic(err)
-	}
-	return id
+	return txfuzz.GetChainID(backend)
 }
 
 func Nonce(addr common.Address) uint64 {
@@ -175,10 +165,7 @@ func Deploy(bytecode string) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-	chainid, err := backend.ChainID(context.Background())
-	if err != nil {
-		return common.Address{}, err
-	}
+	chainid := txfuzz.GetChainID(backend)
 	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	tx := types.NewContractCreation(nonce, common.Big0, 5_000_000, gp.Mul(gp, common.Big2), common.Hex2Bytes(bytecode))
@@ -197,10 +184,7 @@ func Execute(data []byte, gaslimit uint64) error {
 	if err != nil {
 		panic(err)
 	}
-	chainid, err := backend.ChainID(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	chainid := txfuzz.GetChainID(backend)
 	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	tx := types.NewContractCreation(nonce, common.Big1, gaslimit, gp.Mul(gp, common.Big2), data)
