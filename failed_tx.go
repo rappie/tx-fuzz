@@ -88,6 +88,7 @@ type failedTxStorage struct {
 	enabled     bool
 	baseDir     string
 	rpcEndpoint string
+	runID       string // Timestamp-based ID for this fuzzer run
 }
 
 var storage *failedTxStorage
@@ -95,12 +96,16 @@ var storage *failedTxStorage
 // SetFailedTxStorage enables or disables failed transaction storage
 func SetFailedTxStorage(enabled bool, baseDir string, rpcEndpoint string) {
 	if enabled {
+		// Generate run ID from current timestamp
+		runID := time.Now().Format("20060102_150405")
+
 		storage = &failedTxStorage{
 			enabled:     true,
 			baseDir:     baseDir,
 			rpcEndpoint: rpcEndpoint,
+			runID:       runID,
 		}
-		slog.Debug(fmt.Sprintf("Failed transaction storage enabled: dir=%s", baseDir))
+		slog.Debug(fmt.Sprintf("Failed transaction storage enabled: dir=%s/%s", baseDir, runID))
 	} else {
 		storage = nil
 	}
@@ -249,21 +254,20 @@ func gatherAccountState(ctx context.Context, backend *ethclient.Client, account 
 
 // saveToFile writes the failed transaction context to a JSON file
 func saveToFile(ctx FailedTxContext, txType uint8, nonce uint64) error {
-	// Determine transaction type name for subdirectory
+	// Determine transaction type name for filename prefix
 	typeName := getTypeName(txType)
 
-	// Create directory structure: baseDir/YYYY-MM-DD/typeName/
-	dateStr := ctx.Timestamp.Format("2006-01-02")
-	dir := filepath.Join(storage.baseDir, dateStr, typeName)
+	// Create directory structure: baseDir/runID/
+	dir := filepath.Join(storage.baseDir, storage.runID)
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Generate filename: tx_HHMMSS_nonce_N.json
+	// Generate filename: {typeName}_{HHMMSS}_nonce_{N}.json
 	timeStr := ctx.Timestamp.Format("150405")
-	filename := fmt.Sprintf("tx_%s_nonce_%d.json", timeStr, nonce)
-	filepath := filepath.Join(dir, filename)
+	filename := fmt.Sprintf("%s_%s_nonce_%d.json", typeName, timeStr, nonce)
+	filePath := filepath.Join(dir, filename)
 
 	// Marshal to JSON with indentation
 	jsonBytes, err := json.MarshalIndent(ctx, "", "  ")
@@ -272,12 +276,12 @@ func saveToFile(ctx FailedTxContext, txType uint8, nonce uint64) error {
 	}
 
 	// Write atomically: write to temp file, then rename
-	tempPath := filepath + ".tmp"
+	tempPath := filePath + ".tmp"
 	if err := os.WriteFile(tempPath, jsonBytes, 0644); err != nil {
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 
-	if err := os.Rename(tempPath, filepath); err != nil {
+	if err := os.Rename(tempPath, filePath); err != nil {
 		os.Remove(tempPath) // Clean up temp file
 		return fmt.Errorf("failed to rename temp file: %w", err)
 	}
