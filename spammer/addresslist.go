@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -157,41 +158,35 @@ func CreateAddressesRaw(N int) []*ecdsa.PrivateKey {
 func Airdrop(config *Config, value *big.Int) error {
 	backend := ethclient.NewClient(config.backend)
 	sender := crypto.PubkeyToAddress(config.faucet.PublicKey)
-	fmt.Printf("Airdrop faucet is at %x\n", sender)
+	config.Logger.Info(fmt.Sprintf("Starting airdrop from faucet %s", sender))
 	var tx *types.Transaction
 	chainid, err := backend.ChainID(context.Background())
 	if err != nil {
-		fmt.Printf("error getting chain ID; could not airdrop: %v\n", err)
+		config.Logger.Error(fmt.Sprintf("Failed to get chain ID for airdrop: %v", err))
 		return err
 	}
 	for _, addr := range config.keys {
-		nonce, err := backend.PendingNonceAt(context.Background(), sender)
+		nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 		if err != nil {
-			fmt.Printf("error getting pending nonce; could not airdrop: %v\n", err)
+			config.Logger.Error(fmt.Sprintf("Failed to get pending nonce for airdrop: %v", err))
 			return err
 		}
 		to := crypto.PubkeyToAddress(addr.PublicKey)
 		gp, _ := backend.SuggestGasPrice(context.Background())
-		gas, err := backend.EstimateGas(context.Background(), ethereum.CallMsg{
+		gas := txfuzz.EstimateGas(backend, ethereum.CallMsg{
 			From:     crypto.PubkeyToAddress(config.faucet.PublicKey),
 			To:       &to,
 			Gas:      30_000_000,
 			GasPrice: gp,
 			Value:    value,
-		})
-		if err != nil {
-			fmt.Printf("error estimating gas: %v\n", err)
-			fmt.Printf("estimating: from %v, to %v, gas %v, gasprice %v value %v", crypto.PubkeyToAddress(config.faucet.PublicKey), &to, 30_000_000, gp, value)
-			return err
-		}
+		}, 30_000, config.GasMultiplier)
 		tx2 := types.NewTransaction(nonce, to, value, gas, gp, nil)
 		signedTx, _ := types.SignTx(tx2, types.LatestSignerForChainID(chainid), config.faucet)
-		if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
-			fmt.Printf("error sending transaction; could not airdrop: %v\n", err)
+		if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
 			return err
 		}
 		tx = signedTx
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(time.Duration(config.TxDelay) * time.Millisecond)
 	}
 	// Wait for the last transaction to be mined
 	if _, err := bind.WaitMined(context.Background(), backend, tx); err != nil {

@@ -12,7 +12,8 @@ import (
 type Spam func(*Config, *ecdsa.PrivateKey, *filler.Filler) error
 
 func SpamTransactions(config *Config, fun Spam) error {
-	fmt.Printf("Spamming %v transactions per account on %v accounts with seed: 0x%x\n", config.N, len(config.keys), config.seed)
+	config.Logger.Info(fmt.Sprintf("Starting transaction spam: %d tx/account, %d accounts, seed=0x%x",
+		config.N, len(config.keys), config.seed))
 
 	errCh := make(chan error, len(config.keys))
 	var wg sync.WaitGroup
@@ -35,7 +36,7 @@ func SpamTransactions(config *Config, fun Spam) error {
 		// Start a fuzzing thread
 		go func(key *ecdsa.PrivateKey, filler *filler.Filler) {
 			defer wg.Done()
-			errCh <- fun(config, key, f)
+			errCh <- fun(config, key, filler)
 		}(key, f)
 	}
 	wg.Wait()

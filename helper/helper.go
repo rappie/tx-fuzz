@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
 	"math/big"
 
 	"github.com/MariusVanDerWijden/FuzzyVM/filler"
@@ -12,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -32,7 +32,7 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 	cl, _ := GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
-	nonce, err := backend.PendingNonceAt(context.Background(), sender)
+	nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 	if err != nil {
 		panic(err)
 	}
@@ -40,7 +40,7 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Nonce: %v\n", nonce)
+	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, err := backend.SuggestGasPrice(context.Background())
 	if err != nil {
 		panic(err)
@@ -61,12 +61,7 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 		AccessList:    make(types.AccessList, 0),
 		BlobGasFeeCap: big.NewInt(1_000_000),
 	}
-	if gas, err := backend.EstimateGas(context.Background(), msg); err != nil {
-		msg.Gas = uint64(5_000_000)
-		fmt.Printf("Error estimating gas: %v, defaulting to %v gas\n", err, msg.Gas)
-	} else {
-		msg.Gas = gas
-	}
+	msg.Gas = txfuzz.EstimateGas(backend, msg, 5_000_000, 1.0)
 
 	var signedTx *types.Transaction
 	if blobs {
@@ -81,13 +76,8 @@ func ExecWithSK(sk *ecdsa.PrivateKey, addr common.Address, data []byte, blobs bo
 		signedTx, _ = types.SignTx(tx, types.NewCancunSigner(chainid), sk)
 	}
 
-	rlpData, err := signedTx.MarshalBinary()
-	if err != nil {
+	if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
 		panic(err)
-	}
-
-	if err := cl.CallContext(context.Background(), nil, "eth_sendRawTransaction", hexutil.Encode(rlpData)); err != nil {
-		fmt.Println(err)
 	}
 	return signedTx
 }
@@ -96,7 +86,7 @@ func ExecAuth(addr common.Address, data []byte, authList []types.SetCodeAuthoriz
 	cl, sk := GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
-	nonce, err := backend.PendingNonceAt(context.Background(), sender)
+	nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 	if err != nil {
 		panic(err)
 	}
@@ -110,7 +100,7 @@ func ExecAuthWithNonce(addr common.Address, nonce uint64, data []byte, authList 
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Nonce: %v\n", nonce)
+	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, err := backend.SuggestGasPrice(context.Background())
 	if err != nil {
 		panic(err)
@@ -119,8 +109,6 @@ func ExecAuthWithNonce(addr common.Address, nonce uint64, data []byte, authList 
 	if err != nil {
 		panic(err)
 	}
-	var rlpData []byte
-	var _tx *types.Transaction
 	gasLimit := uint64(5_000_000)
 	if authList == nil {
 		buf := make([]byte, 1024)
@@ -133,15 +121,10 @@ func ExecAuthWithNonce(addr common.Address, nonce uint64, data []byte, authList 
 	}
 	tx := txfuzz.New7702Tx(nonce, addr, gasLimit, chainid, tip.Mul(tip, big.NewInt(100)), gp.Mul(gp, big.NewInt(100)), common.Big0, data, big.NewInt(1_000_000), make(types.AccessList, 0), authList)
 	signedTx, _ := types.SignTx(tx, types.NewPragueSigner(chainid), sk)
-	rlpData, err = signedTx.MarshalBinary()
-	if err != nil {
+	if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
 		panic(err)
 	}
-	_tx = signedTx
-	if err := cl.CallContext(context.Background(), nil, "eth_sendRawTransaction", hexutil.Encode(rlpData)); err != nil {
-		fmt.Println(err)
-	}
-	return _tx
+	return signedTx
 }
 
 func GetRealBackend() (*rpc.Client, *ecdsa.PrivateKey) {
@@ -188,7 +171,7 @@ func Deploy(bytecode string) (common.Address, error) {
 	cl, sk := GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := common.HexToAddress(txfuzz.ADDR)
-	nonce, err := backend.PendingNonceAt(context.Background(), sender)
+	nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -196,11 +179,11 @@ func Deploy(bytecode string) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-	fmt.Printf("Nonce: %v\n", nonce)
+	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	tx := types.NewContractCreation(nonce, common.Big0, 5_000_000, gp.Mul(gp, common.Big2), common.Hex2Bytes(bytecode))
 	signedTx, _ := types.SignTx(tx, types.NewCancunSigner(chainid), sk)
-	if err := backend.SendTransaction(context.Background(), signedTx); err != nil {
+	if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
 		return common.Address{}, err
 	}
 	return bind.WaitDeployed(context.Background(), backend, signedTx)
@@ -210,7 +193,7 @@ func Execute(data []byte, gaslimit uint64) error {
 	cl, sk := GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
-	nonce, err := backend.PendingNonceAt(context.Background(), sender)
+	nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 	if err != nil {
 		panic(err)
 	}
@@ -218,11 +201,11 @@ func Execute(data []byte, gaslimit uint64) error {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Nonce: %v\n", nonce)
+	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	tx := types.NewContractCreation(nonce, common.Big1, gaslimit, gp.Mul(gp, common.Big2), data)
 	signedTx, _ := types.SignTx(tx, types.NewLondonSigner(chainid), sk)
-	return backend.SendTransaction(context.Background(), signedTx)
+	return txfuzz.SendTransaction(context.Background(), backend, signedTx)
 }
 
 func RandomBlobData() ([]byte, error) {

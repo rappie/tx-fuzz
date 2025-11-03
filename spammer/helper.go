@@ -5,9 +5,11 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"time"
 
+	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,35 +20,35 @@ import (
 
 const batchSize = 50
 
-func SendTx(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int) (*types.Transaction, error) {
+func SendTx(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int) (*types.Transaction, error) {
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
 	nonce, err := backend.NonceAt(context.Background(), sender, nil)
 	if err != nil {
-		fmt.Printf("Could not get pending nonce: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to get pending nonce: %v (sender=%s)", err, sender))
 	}
-	return sendTxWithNonce(sk, backend, to, value, nonce)
+	return sendTxWithNonce(config, sk, backend, to, value, nonce)
 }
 
-func sendTxWithNonce(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, nonce uint64) (*types.Transaction, error) {
+func sendTxWithNonce(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, nonce uint64) (*types.Transaction, error) {
 	chainid, err := backend.ChainID(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	gp, _ := backend.SuggestGasPrice(context.Background())
-	gas, _ := backend.EstimateGas(context.Background(), ethereum.CallMsg{
+	gas := txfuzz.EstimateGas(backend, ethereum.CallMsg{
 		From:     crypto.PubkeyToAddress(sk.PublicKey),
 		To:       &to,
 		Gas:      30_000_000,
 		GasPrice: gp,
 		Value:    value,
 		Data:     nil,
-	})
+	}, 30_000, config.GasMultiplier)
 	tx := types.NewTransaction(nonce, to, value, gas, gp.Mul(gp, big.NewInt(100)), nil)
 	signedTx, _ := types.SignTx(tx, types.NewEIP155Signer(chainid), sk)
-	return signedTx, backend.SendTransaction(context.Background(), signedTx)
+	return signedTx, txfuzz.SendTransaction(context.Background(), backend, signedTx)
 }
 
-func sendRecurringTx(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, numTxs uint64) (*types.Transaction, error) {
+func sendRecurringTx(config *Config, sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.Address, value *big.Int, numTxs uint64) (*types.Transaction, error) {
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
 	nonce, err := backend.NonceAt(context.Background(), sender, nil)
 	if err != nil {
@@ -56,7 +58,7 @@ func sendRecurringTx(sk *ecdsa.PrivateKey, backend *ethclient.Client, to common.
 		tx *types.Transaction
 	)
 	for i := 0; i < int(numTxs); i++ {
-		tx, err = sendTxWithNonce(sk, backend, to, value, nonce+uint64(i))
+		tx, err = sendTxWithNonce(config, sk, backend, to, value, nonce+uint64(i))
 	}
 	return tx, err
 }
@@ -91,8 +93,8 @@ func tryUnstuck(config *Config, sk *ecdsa.PrivateKey) error {
 		if noTx > batchSize {
 			noTx = batchSize
 		}
-		fmt.Println("Sending transaction to unstuck account")
-		tx, err := sendRecurringTx(sk, client, addr, big.NewInt(1), noTx)
+		config.Logger.Info(fmt.Sprintf("Sending %d transactions to unstuck account %s", noTx, addr))
+		tx, err := sendRecurringTx(config, sk, client, addr, big.NewInt(1), noTx)
 		if err != nil {
 			return err
 		}
@@ -102,7 +104,7 @@ func tryUnstuck(config *Config, sk *ecdsa.PrivateKey) error {
 			return err
 		}
 	}
-	fmt.Printf("Could not unstuck account %v after 100 tries\n", addr)
+	config.Logger.Error(fmt.Sprintf("Failed to unstuck account %s after 100 tries", addr))
 	return errors.New("unstuck timed out, please retry manually")
 }
 
@@ -113,13 +115,14 @@ func isStuck(config *Config, account common.Address) (uint64, error) {
 		return 0, err
 	}
 
-	pendingNonce, err := client.PendingNonceAt(context.Background(), account)
+	pendingNonce, err := txfuzz.GetPendingNonce(context.Background(), client, account)
 	if err != nil {
 		return 0, err
 	}
 
 	if pendingNonce != nonce {
-		fmt.Printf("Account %v is stuck: pendingNonce: %v currentNonce: %v, missing nonces: %v\n", account, pendingNonce, nonce, pendingNonce-nonce)
+		config.Logger.Info(fmt.Sprintf("Account %s is stuck: pending=%d, current=%d, missing=%d",
+			account, pendingNonce, nonce, pendingNonce-nonce))
 		return pendingNonce - nonce, nil
 	}
 	return 0, nil

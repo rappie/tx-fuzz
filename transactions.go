@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"math/rand"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/holiman/uint256"
@@ -31,7 +31,7 @@ func RandomTx(f *filler.Filler) (*types.Transaction, error) {
 	nonce := uint64(rand.Int63())
 	gasPrice := big.NewInt(rand.Int63())
 	chainID := big.NewInt(rand.Int63())
-	return RandomValidTx(nil, f, common.Address{}, nonce, gasPrice, chainID, false)
+	return RandomValidTx(nil, f, common.Address{}, nonce, gasPrice, chainID, false, 1.0)
 }
 
 type txConf struct {
@@ -46,7 +46,109 @@ type txConf struct {
 	code     []byte
 }
 
-func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int) *txConf {
+// EstimateGas estimates gas for a transaction with optional multiplier and fallback default.
+// If estimation fails, it logs a warning and returns defaultGas.
+// If estimation succeeds, it applies the multiplier and returns the adjusted value.
+func EstimateGas(backend *ethclient.Client, msg ethereum.CallMsg, defaultGas uint64, multiplier float64) uint64 {
+	gas, err := backend.EstimateGas(context.Background(), msg)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("Failed to estimate gas, using default %d: %v", defaultGas, err))
+
+		// Save failed gas estimation if storage is enabled
+		SaveFailedGasEstimation(context.Background(), backend, msg, err)
+
+		return defaultGas
+	}
+
+	// Apply multiplier
+	adjustedGas := uint64(float64(gas) * multiplier)
+	if multiplier != 1.0 {
+		slog.Debug(fmt.Sprintf("Estimated gas: %d, adjusted: %d (multiplier: %.2f)", gas, adjustedGas, multiplier))
+	}
+	return adjustedGas
+}
+
+// SendTransaction sends a transaction with debug logging before and after.
+func SendTransaction(ctx context.Context, backend *ethclient.Client, tx *types.Transaction) error {
+	// Extract transaction details
+	var from common.Address
+	var signer types.Signer
+
+	// Determine signer based on transaction type
+	if tx.Type() == types.BlobTxType || tx.Type() == types.DynamicFeeTxType {
+		signer = types.LatestSignerForChainID(tx.ChainId())
+	} else if tx.Type() == types.SetCodeTxType {
+		signer = types.NewPragueSigner(tx.ChainId())
+	} else {
+		signer = types.LatestSignerForChainID(tx.ChainId())
+	}
+
+	from, err := types.Sender(signer, tx)
+	if err != nil {
+		from = common.Address{} // Use zero address if we can't recover sender
+	}
+
+	to := "contract_creation"
+	if tx.To() != nil {
+		to = tx.To().Hex()
+	}
+
+	// Format gas price based on transaction type
+	gasPrice := "unknown"
+	if tx.GasPrice() != nil && tx.GasPrice().Sign() > 0 {
+		gasPrice = tx.GasPrice().String()
+	} else if tx.GasFeeCap() != nil {
+		gasPrice = fmt.Sprintf("tip=%s/cap=%s", tx.GasTipCap().String(), tx.GasFeeCap().String())
+	}
+
+	// Log before sending
+	slog.Debug(fmt.Sprintf("Sending transaction: from=%s to=%s nonce=%d gas=%d gasPrice=%s value=%s dataLen=%d type=%d",
+		from.Hex(), to, tx.Nonce(), tx.Gas(), gasPrice, tx.Value().String(), len(tx.Data()), tx.Type()))
+
+	// Send transaction
+	err = backend.SendTransaction(ctx, tx)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("Transaction failed: %v (from=%s to=%s nonce=%d)", err, from.Hex(), to, tx.Nonce()))
+
+		// Save failed transaction if storage is enabled
+		SaveFailedTransaction(ctx, backend, tx, err)
+
+		return err
+	}
+
+	// Log success
+	slog.Debug(fmt.Sprintf("Transaction sent: hash=%s nonce=%d", tx.Hash().Hex(), tx.Nonce()))
+	return nil
+}
+
+// GetPendingNonce gets the pending nonce for an address with debug logging.
+// If local nonce tracking is enabled, checks the cache first before querying RPC.
+func GetPendingNonce(ctx context.Context, backend *ethclient.Client, sender common.Address) (uint64, error) {
+	// Check cache first (if enabled)
+	if nonceManager != nil && nonceManager.enabled {
+		if nonce, exists := nonceManager.Get(sender); exists {
+			slog.Debug(fmt.Sprintf("Using cached nonce: %d (sender=%s)", nonce, sender.Hex()))
+			return nonce, nil
+		}
+	}
+
+	// Query network (first time or disabled)
+	nonce, err := backend.PendingNonceAt(ctx, sender)
+	if err != nil {
+		return 0, err
+	}
+
+	// Cache for next time (if enabled)
+	// Store the nonce as-is; Get() will increment it for subsequent calls
+	if nonceManager != nil && nonceManager.enabled {
+		nonceManager.Set(sender, nonce)
+	}
+
+	slog.Debug(fmt.Sprintf("Got pending nonce from RPC: %d (sender=%s)", nonce, sender.Hex()))
+	return nonce, nil
+}
+
+func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, gasMultiplier float64) *txConf {
 	// defaults
 	gasCost := uint64(100000)
 	to := randomAddress()
@@ -62,19 +164,19 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 		if gasPrice == nil {
 			gasPrice, err = client.SuggestGasPrice(context.Background())
 			if err != nil {
-				log.Warn("Error suggesting gas price: %v", err)
+				slog.Warn(fmt.Sprintf("Failed to suggest gas price, using default 1: %v", err))
 				gasPrice = big.NewInt(1)
 			}
 		}
 		if chainID == nil {
 			chainID, err = client.ChainID(context.Background())
 			if err != nil {
-				log.Warn("Error fetching chain id: %v", err)
+				slog.Warn(fmt.Sprintf("Failed to fetch chain ID, using default 1: %v", err))
 				chainID = big.NewInt(1)
 			}
 		}
 		// Try to estimate gas
-		gas, err := client.EstimateGas(context.Background(), ethereum.CallMsg{
+		gasCost = EstimateGas(client, ethereum.CallMsg{
 			From:      sender,
 			To:        &to,
 			Gas:       30_000_000,
@@ -83,11 +185,7 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 			GasTipCap: gasPrice,
 			Value:     value,
 			Data:      code,
-		})
-		if err == nil {
-			fmt.Printf("Error estimating gas: %v", err)
-			gasCost = gas
-		}
+		}, gasCost, gasMultiplier)
 	}
 
 	return &txConf{
@@ -107,8 +205,8 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 // It does not mean that the transaction will succeed, but that it is well-formed.
 // If gasPrice is not set, we will try to get it from the rpc
 // If chainID is not set, we will try to get it from the rpc
-func RandomValidTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool) (*types.Transaction, error) {
-	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID)
+func RandomValidTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool, gasMultiplier float64) (*types.Transaction, error) {
+	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID, gasMultiplier)
 	var index int
 	if al {
 		index = rand.Intn(len(alStrategies))
@@ -119,8 +217,8 @@ func RandomValidTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, non
 	}
 }
 
-func RandomBlobTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool) (*types.Transaction, error) {
-	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID)
+func RandomBlobTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool, gasMultiplier float64) (*types.Transaction, error) {
+	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID, gasMultiplier)
 	if al {
 		return fullAlBlobTx(conf)
 	} else {
@@ -128,8 +226,8 @@ func RandomBlobTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonc
 	}
 }
 
-func RandomAuthTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool, aList []types.SetCodeAuthorization) (*types.Transaction, error) {
-	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID)
+func RandomAuthTx(rpc *rpc.Client, f *filler.Filler, sender common.Address, nonce uint64, gasPrice, chainID *big.Int, al bool, aList []types.SetCodeAuthorization, gasMultiplier float64) (*types.Transaction, error) {
+	conf := initDefaultTxConf(rpc, f, sender, nonce, gasPrice, chainID, gasMultiplier)
 	tx := types.NewTransaction(conf.nonce, *conf.to, conf.value, conf.gasLimit, conf.gasPrice, conf.code)
 	var list types.AccessList
 	if al {

@@ -6,6 +6,7 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"os"
 
@@ -21,14 +22,17 @@ import (
 
 type Config struct {
 	backend *rpc.Client // connection to the rpc provider
+	Logger  *slog.Logger // structured logger
 
-	N          uint64              // number of transactions send per account
-	faucet     *ecdsa.PrivateKey   // private key of the faucet account
-	keys       []*ecdsa.PrivateKey // private keys of accounts
-	corpus     [][]byte            // optional corpus to use elements from
-	accessList bool                // whether to create accesslist transactions
-	gasLimit   uint64              // gas limit per transaction
-	SlotTime   uint64              // slot time in seconds
+	N             uint64              // number of transactions send per account
+	faucet        *ecdsa.PrivateKey   // private key of the faucet account
+	keys          []*ecdsa.PrivateKey // private keys of accounts
+	corpus        [][]byte            // optional corpus to use elements from
+	accessList    bool                // whether to create accesslist transactions
+	gasLimit      uint64              // gas limit per transaction
+	GasMultiplier float64             // multiplier for gas estimation
+	TxDelay       uint64              // delay between transactions in milliseconds
+	SlotTime      uint64              // slot time in seconds
 
 	seed int64            // seed used for generating randomness
 	mut  *mutator.Mutator // Mutator based on the seed
@@ -47,28 +51,65 @@ func NewDefaultConfig(rpcAddr string, N uint64, accessList bool, rng *rand.Rand)
 		keys = append(keys, crypto.ToECDSAUnsafe(common.FromHex(staticKeys[i])))
 	}
 
+	// Enable local nonce tracking by default
+	txfuzz.SetNonceManager(true)
+
+	// Disable failed transaction storage by default (no flag available in this constructor)
+	txfuzz.SetFailedTxStorage(false, "", "")
+
 	return &Config{
-		backend:    backend,
-		N:          N,
-		faucet:     crypto.ToECDSAUnsafe(common.FromHex(txfuzz.SK)),
-		keys:       keys,
-		corpus:     [][]byte{},
-		accessList: accessList,
-		gasLimit:   30_000_000,
-		seed:       0,
-		mut:        mutator.NewMutator(rng),
+		backend:       backend,
+		N:             N,
+		faucet:        crypto.ToECDSAUnsafe(common.FromHex(txfuzz.SK)),
+		keys:          keys,
+		corpus:        [][]byte{},
+		accessList:    accessList,
+		gasLimit:      30_000_000,
+		GasMultiplier: 1.0,
+		TxDelay:       10,
+		seed:          0,
+		mut:           mutator.NewMutator(rng),
 	}, nil
 }
 
 func NewPartialConfig(backend *rpc.Client, faucet *ecdsa.PrivateKey, keys []*ecdsa.PrivateKey) *Config {
+	// Enable local nonce tracking by default
+	txfuzz.SetNonceManager(true)
+
+	// Disable failed transaction storage by default (no flag available in this constructor)
+	txfuzz.SetFailedTxStorage(false, "", "")
+
 	return &Config{
-		backend: backend,
-		faucet:  faucet,
-		keys:    keys,
+		backend:       backend,
+		faucet:        faucet,
+		keys:          keys,
+		GasMultiplier: 1.0,
+		TxDelay:       10,
 	}
 }
 
 func NewConfigFromContext(c *cli.Context) (*Config, error) {
+	// Setup logger first so we can use it throughout
+	logLevelStr := c.String(flags.LogLevelFlag.Name)
+	var logLevel slog.Level
+	switch logLevelStr {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "info":
+		logLevel = slog.LevelInfo
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	default:
+		logLevel = slog.LevelInfo
+	}
+	handler := txfuzz.NewCompactHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
+	logger := slog.New(handler)
+
+	// Set as default logger so all slog calls use the same format
+	slog.SetDefault(logger)
+
 	// Setup RPC
 	rpcAddr := c.String(flags.RpcFlag.Name)
 	backend, err := rpc.Dial(rpcAddr)
@@ -89,7 +130,7 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 	var keys []*ecdsa.PrivateKey
 	nKeys := c.Int(flags.CountFlag.Name)
 	if nKeys == 0 || nKeys > len(staticKeys) {
-		fmt.Printf("Sanitizing count flag from %v to %v\n", nKeys, len(staticKeys))
+		logger.Debug(fmt.Sprintf("Sanitizing count flag: %d -> %d", nKeys, len(staticKeys)))
 		nKeys = len(staticKeys)
 	}
 	for i := 0; i < nKeys; i++ {
@@ -110,13 +151,19 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 
 	slotTime := c.Uint64(flags.SlotTimeFlag.Name)
 
+	// Setup gas multiplier
+	gasMultiplier := c.Float64(flags.GasMultiplierFlag.Name)
+
+	// Setup transaction delay
+	txDelay := c.Int(flags.TxDelayFlag.Name)
+
 	// Setup seed
 	seed := c.Int64(flags.SeedFlag.Name)
 	if seed == 0 {
 		rnd := make([]byte, 8)
 		crand.Read(rnd)
 		seed = int64(binary.BigEndian.Uint64(rnd))
-		fmt.Printf("No seed provided, creating one: %x\n", seed)
+		logger.Debug(fmt.Sprintf("No seed provided, creating random seed: 0x%x", seed))
 	}
 
 	// Setup Mutator
@@ -131,17 +178,28 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 		}
 	}
 
+	// Setup local nonce tracking
+	localNonce := !c.Bool(flags.NoLocalNonceFlag.Name)
+	txfuzz.SetNonceManager(localNonce)
+
+	// Setup failed transaction storage
+	saveFailedTxs := c.Bool(flags.SaveFailedTxsFlag.Name)
+	txfuzz.SetFailedTxStorage(saveFailedTxs, "./failed_txs", rpcAddr)
+
 	return &Config{
-		backend:    backend,
-		N:          uint64(N),
-		faucet:     faucet,
-		accessList: !c.Bool(flags.NoALFlag.Name),
-		gasLimit:   uint64(gasLimit),
-		seed:       seed,
-		keys:       keys,
-		corpus:     corpus,
-		mut:        mut,
-		SlotTime:   slotTime,
+		backend:       backend,
+		Logger:        logger,
+		N:             uint64(N),
+		faucet:        faucet,
+		accessList:    !c.Bool(flags.NoALFlag.Name),
+		gasLimit:      uint64(gasLimit),
+		GasMultiplier: gasMultiplier,
+		TxDelay:       uint64(txDelay),
+		seed:          seed,
+		keys:          keys,
+		corpus:        corpus,
+		mut:           mut,
+		SlotTime:      slotTime,
 	}, nil
 }
 

@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"math/big"
+	"os"
 
 	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/MariusVanDerWijden/tx-fuzz/helper"
@@ -19,6 +21,10 @@ import (
 )
 
 func main() {
+	// Setup consistent logging
+	handler := txfuzz.NewCompactHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	slog.SetDefault(slog.New(handler))
+
 	testTouchContracts()
 	test2537()
 	test2537Long()
@@ -32,7 +38,7 @@ func main() {
 }
 
 func testTouchContracts() {
-	fmt.Println("Touching contracts")
+	slog.Info("Touching contracts")
 	// touch beacon root addr
 	addresses := []common.Address{
 		common.HexToAddress("0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02"), // beacon roots
@@ -56,7 +62,7 @@ func testTouchContracts() {
 }
 
 func test3074() {
-	fmt.Println("EIP-3074")
+	slog.Info("EIP-3074")
 	// auth
 	helper.Execute([]byte{0x5f, 0x5f, 0x5f, 0xf6, 0x80, 0x55}, 200000)
 	helper.Execute([]byte{0x64, 0xff, 0xff, 0xff, 0xff, 0x64, 0xff, 0xff, 0xff, 0xff, 0x64, 0xff, 0xff, 0xff, 0xff, 0xf6, 0x80, 0x55}, 200000)
@@ -64,7 +70,7 @@ func test3074() {
 	helper.Execute([]byte{0x5f, 0x5f, 0x5f, 0x5f, 0x5f, 0x5f, 0x5f, 0xf7, 0x80, 0x55}, 200000)
 	helper.Execute([]byte{0x5f, 0x5f, 0x5f, 0x5f, 0x5f, 0x5f, 0x5a, 0xf7, 0x80, 0x55}, 200000)
 	helper.Execute([]byte{0x64, 0xff, 0xff, 0xff, 0xff, 0x5f, 0x64, 0xff, 0xff, 0xff, 0xff, 0x5f, 0x5f, 0x5f, 0x5a, 0xf7, 0x80, 0x55}, 200000)
-	fmt.Println("Execution tests")
+	slog.Info("Execution tests")
 	vectors := [][]byte{
 		common.FromHex("000f6617e03f2800b69a0b018d3062535ec761c6648a4c73be71f97885e28505f67f0d4ee582093960a99757587fe74e6ec173477c4ca05310e25158152ff99d4f0000000000000000000000000000000000000000000000000000000000000001"),
 		common.FromHex("0x6001615dc06000f615600155"),
@@ -78,7 +84,7 @@ func test3074() {
 }
 
 func test2537() {
-	fmt.Println("EIP-2537")
+	slog.Info("EIP-2537")
 	vectors := [][]byte{
 		{},
 		{0x5f},             // small input
@@ -111,7 +117,7 @@ func test2537() {
 
 // test7002 creates withdrawal requests in the EIP-7002 queue.
 func test7002() {
-	fmt.Println("test7002")
+	slog.Info("Test 7002")
 
 	cl, _ := helper.GetRealBackend()
 	backend := ethclient.NewClient(cl)
@@ -145,7 +151,7 @@ func test7002() {
 
 // test7251 creates consolidation requests in the EIP-7251 queue.
 func test7251() {
-	fmt.Println("test7251")
+	slog.Info("Test 7251")
 	contract := common.HexToAddress("0x01aBEa29659e5e97C95107F20bb753cD3e09bBBb")
 	inputs := [][]byte{
 		// input data is source_blskey(48) || target_blskey(48)
@@ -163,7 +169,7 @@ func test7251() {
 }
 
 func test2537Long() {
-	fmt.Println("EIP-2537_long")
+	slog.Info("EIP-2537_long")
 	multiexpG1 := common.FromHex("00000000000000000000000000000000024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80000000000000000000000000000000013e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e000000000000000000000000000000000ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801000000000000000000000000000000000606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be00000000000000000000000000000000024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80000000000000000000000000000000013e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e000000000000000000000000000000000ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801000000000000000000000000000000000606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be")
 	testLongBLS(0x0d, multiexpG1)
 	multiexpG2 := common.FromHex("000000000000000000000000000000000572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e00000000000000000000000000000000166a9d8cabc673a322fda673779d8e3822ba3ecb8670e461f73bb9021d5fd76a4c56d9d4cd16bd1bba86881979749d2800000000000000000000000000000000122915c824a0857e2ee414a3dccb23ae691ae54329781315a0c75df1c04d6d7a50a030fc866f09d516020ef82324afae0000000000000000000000000000000009380275bbc8e5dcea7dc4dd7e0550ff2ac480905396eda55062650f8d251c96eb480673937cc6d9d6a44aaa56ca66dc000000000000000000000000000000000b21da7955969e61010c7a1abc1a6f0136961d1e3b20b1a7326ac738fef5c721479dfd948b52fdf2455e44813ecfd8920000000000000000000000000000000008f239ba329b3967fe48d718a36cfe5f62a7e42e0bf1c1ed714150a166bfbd6bcf6b3b58b975b9edea56d53f23a0e8490000000000000000000000000000000006e82f6da4520f85c5d27d8f329eccfa05944fd1096b20734c894966d12a9e2a9a9744529d7212d33883113a0cadb9090000000000000000000000000000000017d81038f7d60bee9110d9c0d6d1102fe2d998c957f28e31ec284cc04134df8e47e8f82ff3af2e60a6d9688a4563477c00000000000000000000000000000000024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80000000000000000000000000000000013e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e000000000000000000000000000000000d1b3cc2c7027888be51d9ef691d77bcb679afda66c73f17f9ee3837a55024f78c71363275a75d75d86bab79f74782aa0000000000000000000000000000000013fa4d4a0ad8b1ce186ed5061789213d993923066dddaf1040bc3ff59f825c78df74f2d75467e25e0f55f8a00fa030ed")
@@ -199,7 +205,7 @@ func makeTxWithValue(addr common.Address, value *big.Int, data []byte) *types.Tr
 	cl, sk := helper.GetRealBackend()
 	backend := ethclient.NewClient(cl)
 	sender := common.HexToAddress(txfuzz.ADDR)
-	nonce, err := backend.PendingNonceAt(ctx, sender)
+	nonce, err := txfuzz.GetPendingNonce(ctx, backend, sender)
 	if err != nil {
 		panic(err)
 	}
@@ -229,7 +235,7 @@ func makeTxWithValue(addr common.Address, value *big.Int, data []byte) *types.Tr
 }
 
 func test7702() {
-	fmt.Println("EIP-7702")
+	slog.Info("EIP-7702")
 	proxy, err := deploy7702Proxy()
 	if err != nil {
 		panic(err)
@@ -297,7 +303,7 @@ func do7702Calls(addr common.Address) {
 }
 
 func test2935() {
-	fmt.Println("EIP-2935")
+	slog.Info("EIP-2935")
 	contr, err := deploy2935Caller()
 	if err != nil {
 		panic(err)

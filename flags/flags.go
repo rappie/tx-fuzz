@@ -56,6 +56,37 @@ var (
 		Value: 12,
 	}
 
+	LogLevelFlag = &cli.StringFlag{
+		Name:    "log-level",
+		Aliases: []string{"l"},
+		Usage:   "Set log level (debug, info, warn, error)",
+		Value:   "info",
+	}
+
+	GasMultiplierFlag = &cli.Float64Flag{
+		Name:  "gas-multiplier",
+		Usage: "Multiplier for gas estimation (e.g., 1.2 for 20% buffer)",
+		Value: 1.0,
+	}
+
+	TxDelayFlag = &cli.IntFlag{
+		Name:  "tx-delay",
+		Usage: "Delay between transactions in milliseconds",
+		Value: 10,
+	}
+
+	NoLocalNonceFlag = &cli.BoolFlag{
+		Name:  "no-local-nonce",
+		Usage: "Disable local nonce tracking (query RPC for every transaction)",
+		Value: false,
+	}
+
+	SaveFailedTxsFlag = &cli.BoolFlag{
+		Name:  "save-failed-txs",
+		Usage: "Save failed transactions to disk for later analysis",
+		Value: false,
+	}
+
 	SpamFlags = []cli.Flag{
 		SkFlag,
 		SeedFlag,
@@ -66,5 +97,10 @@ var (
 		CountFlag,
 		GasLimitFlag,
 		SlotTimeFlag,
+		LogLevelFlag,
+		GasMultiplierFlag,
+		TxDelayFlag,
+		NoLocalNonceFlag,
+		SaveFailedTxsFlag,
 	}
 )

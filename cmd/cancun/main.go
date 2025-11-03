@@ -4,9 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
+	"log/slog"
+	"os"
 	"time"
 
+	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/MariusVanDerWijden/tx-fuzz/helper"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
@@ -14,17 +16,21 @@ import (
 )
 
 func main() {
-	fmt.Println("4788")
+	// Setup consistent logging
+	handler := txfuzz.NewCompactHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	slog.SetDefault(slog.New(handler))
+
+	slog.Info("EIP-4788")
 	test4788()
-	fmt.Println("1153")
+	slog.Info("EIP-1153")
 	test1153()
-	fmt.Println("7516")
+	slog.Info("EIP-7516")
 	test7516()
-	fmt.Println("5656")
+	slog.Info("EIP-5656")
 	test5656()
-	fmt.Println("4844_prec")
+	slog.Info("EIP-4844 precompile")
 	test4844_precompile()
-	fmt.Println("4844")
+	slog.Info("EIP-4844")
 	test4844()
 }
 
