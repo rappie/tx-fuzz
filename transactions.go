@@ -53,6 +53,10 @@ func EstimateGas(backend *ethclient.Client, msg ethereum.CallMsg, defaultGas uin
 	gas, err := backend.EstimateGas(context.Background(), msg)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("Failed to estimate gas, using default %d: %v", defaultGas, err))
+
+		// Save failed gas estimation if storage is enabled
+		SaveFailedGasEstimation(context.Background(), backend, msg, err)
+
 		return defaultGas
 	}
 

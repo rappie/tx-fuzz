@@ -53,6 +53,9 @@ func SendBasicTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fill
 		defer cancel()
 		if _, err := bind.WaitMined(ctx, backend, lastTx); err != nil {
 			config.Logger.Warn(fmt.Sprintf("Waiting for transactions to be mined failed: %v", err))
+
+			// Save transaction that timed out waiting to be mined
+			txfuzz.SaveFailedTransaction(context.Background(), backend, lastTx, err)
 		}
 	}
 	return nil

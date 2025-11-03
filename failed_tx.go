@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -83,6 +84,31 @@ type FuzzerContext struct {
 	GasMultiplier float64 `json:"gasMultiplier,omitempty"`
 }
 
+// FailedGasEstimationContext contains complete context about a failed gas estimation
+type FailedGasEstimationContext struct {
+	Version   string    `json:"version"`
+	Timestamp time.Time `json:"timestamp"`
+	Type      string    `json:"type"` // Always "gas_estimation_failure"
+
+	Error ErrorInfo `json:"error"`
+
+	Network NetworkState `json:"network"`
+
+	CallMsg CallMsgInfo `json:"callMsg"`
+}
+
+// CallMsgInfo contains the ethereum.CallMsg parameters used for gas estimation
+type CallMsgInfo struct {
+	From      string `json:"from"`
+	To        string `json:"to"` // Empty for contract creation
+	Gas       uint64 `json:"gas"`
+	GasPrice  string `json:"gasPrice,omitempty"`
+	GasFeeCap string `json:"gasFeeCap,omitempty"`
+	GasTipCap string `json:"gasTipCap,omitempty"`
+	Value     string `json:"value"`
+	Data      string `json:"data"`
+}
+
 // failedTxStorage holds the storage configuration
 type failedTxStorage struct {
 	enabled     bool
@@ -117,6 +143,10 @@ func SaveFailedTransaction(ctx context.Context, backend *ethclient.Client, tx *t
 		return
 	}
 
+	// Capture error message immediately to avoid any potential race conditions
+	errorMessage := err.Error()
+	slog.Warn(fmt.Sprintf("Saving failed transaction: error=%s nonce=%d", errorMessage, tx.Nonce()))
+
 	// Extract transaction details
 	txInfo, sender := extractTransactionInfo(tx)
 
@@ -130,7 +160,7 @@ func SaveFailedTransaction(ctx context.Context, backend *ethclient.Client, tx *t
 	failedCtx := FailedTxContext{
 		Version:      "1.0",
 		Timestamp:    time.Now().UTC(),
-		Error:        ErrorInfo{Message: err.Error()},
+		Error:        ErrorInfo{Message: errorMessage},
 		Network:      networkState,
 		Transaction:  txInfo,
 		AccountState: accountState,
@@ -143,6 +173,103 @@ func SaveFailedTransaction(ctx context.Context, backend *ethclient.Client, tx *t
 	} else {
 		slog.Info(fmt.Sprintf("Saved failed transaction: nonce=%d type=%d", tx.Nonce(), tx.Type()))
 	}
+}
+
+// SaveFailedGasEstimation saves a failed gas estimation to disk with full context
+func SaveFailedGasEstimation(ctx context.Context, backend *ethclient.Client, msg ethereum.CallMsg, err error) {
+	if storage == nil || !storage.enabled {
+		return
+	}
+
+	// Capture error message immediately
+	errorMessage := err.Error()
+	slog.Warn(fmt.Sprintf("Saving failed gas estimation: error=%s from=%s", errorMessage, msg.From.Hex()))
+
+	// Extract CallMsg info
+	callMsgInfo := extractCallMsgInfo(msg)
+
+	// Gather network state
+	networkState := gatherNetworkState(ctx, backend, storage.rpcEndpoint)
+
+	// Build full context
+	failedCtx := FailedGasEstimationContext{
+		Version:   "1.0",
+		Timestamp: time.Now().UTC(),
+		Type:      "gas_estimation_failure",
+		Error:     ErrorInfo{Message: errorMessage},
+		Network:   networkState,
+		CallMsg:   callMsgInfo,
+	}
+
+	// Save to disk
+	if err := saveGasEstimationToFile(failedCtx, msg.From); err != nil {
+		slog.Warn(fmt.Sprintf("Failed to save failed gas estimation: %v", err))
+	} else {
+		slog.Info(fmt.Sprintf("Saved failed gas estimation: from=%s", msg.From.Hex()))
+	}
+}
+
+// extractCallMsgInfo extracts info from ethereum.CallMsg
+func extractCallMsgInfo(msg ethereum.CallMsg) CallMsgInfo {
+	info := CallMsgInfo{
+		From:  msg.From.Hex(),
+		Gas:   msg.Gas,
+		Value: bigIntToString(msg.Value),
+		Data:  fmt.Sprintf("0x%x", msg.Data),
+	}
+
+	// To address (may be nil for contract creation)
+	if msg.To != nil {
+		info.To = msg.To.Hex()
+	}
+
+	// Gas pricing fields
+	if msg.GasPrice != nil {
+		info.GasPrice = msg.GasPrice.String()
+	}
+	if msg.GasFeeCap != nil {
+		info.GasFeeCap = msg.GasFeeCap.String()
+	}
+	if msg.GasTipCap != nil {
+		info.GasTipCap = msg.GasTipCap.String()
+	}
+
+	return info
+}
+
+// saveGasEstimationToFile writes the failed gas estimation context to a JSON file
+func saveGasEstimationToFile(ctx FailedGasEstimationContext, from common.Address) error {
+	// Create directory structure: baseDir/runID/
+	dir := filepath.Join(storage.baseDir, storage.runID)
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Generate filename: gas_estimation_{HHMMSS}_from_{short}.json
+	timeStr := ctx.Timestamp.Format("150405")
+	shortAddr := from.Hex()[2:10] // First 8 hex chars after 0x
+	filename := fmt.Sprintf("gas_estimation_%s_from_%s.json", timeStr, shortAddr)
+	filePath := filepath.Join(dir, filename)
+
+	// Marshal to JSON with indentation
+	jsonBytes, err := json.MarshalIndent(ctx, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	// Write atomically: write to temp file, then rename
+	tempPath := filePath + ".tmp"
+	if err := os.WriteFile(tempPath, jsonBytes, 0644); err != nil {
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	if err := os.Rename(tempPath, filePath); err != nil {
+		os.Remove(tempPath) // Clean up temp file
+		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	return nil
 }
 
 // extractTransactionInfo extracts all relevant info from a transaction
