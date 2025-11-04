@@ -91,7 +91,7 @@ func runAirdrop(c *cli.Context) error {
 		return err
 	}
 	txPerAccount := config.N
-	airdropValue := new(big.Int).Mul(big.NewInt(int64(txPerAccount*100000)), big.NewInt(params.GWei))
+	airdropValue := new(big.Int).Mul(big.NewInt(int64(txPerAccount*10000000)), big.NewInt(params.GWei))
 	spammer.Airdrop(config, airdropValue)
 	return nil
 }
@@ -116,7 +116,7 @@ func runBasicSpam(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	airdropValue := new(big.Int).Mul(big.NewInt(int64((1+config.N)*1000000)), big.NewInt(params.GWei))
+	airdropValue := new(big.Int).Mul(big.NewInt(int64((1+config.N)*100000000)), big.NewInt(params.GWei))
 	return spam(config, spammer.SendBasicTransactions, airdropValue)
 }
 
@@ -125,7 +125,7 @@ func runBlobSpam(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	airdropValue := new(big.Int).Mul(big.NewInt(int64((1+config.N)*1000000)), big.NewInt(params.GWei))
+	airdropValue := new(big.Int).Mul(big.NewInt(int64((1+config.N)*100000000)), big.NewInt(params.GWei))
 	airdropValue = airdropValue.Mul(airdropValue, big.NewInt(100))
 	return spam(config, spammer.SendBlobTransactions, airdropValue)
 }
@@ -135,7 +135,7 @@ func run7702Spam(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	airdropValue := new(big.Int).Mul(big.NewInt(int64((1+config.N)*1000000)), big.NewInt(params.GWei))
+	airdropValue := new(big.Int).Mul(big.NewInt(int64((1+config.N)*100000000)), big.NewInt(params.GWei))
 	airdropValue = airdropValue.Mul(airdropValue, big.NewInt(100))
 	return spam(config, spammer.Send7702Transactions, airdropValue)
 }
