@@ -58,9 +58,6 @@ func replayTransaction(jsonFile string, rpcURL string) error {
 
 	// Validate error type
 	slog.Info(fmt.Sprintf("Original error: %s", failedCtx.Error.Message))
-	if failedCtx.Error.Message != "Exceeds block gas limit" {
-		return fmt.Errorf("wrong error type: expected 'Exceeds block gas limit', got '%s'", failedCtx.Error.Message)
-	}
 
 	// Decode RLP transaction
 	slog.Info(fmt.Sprintf("Decoding transaction RLP (type=%d, nonce=%d)", failedCtx.Transaction.Type, failedCtx.Transaction.Nonce))
