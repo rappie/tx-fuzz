@@ -76,6 +76,11 @@ type txConf struct {
 // If estimation succeeds, it applies the multiplier and returns the adjusted value.
 // Returns (adjustedGas, originalEstimate) where originalEstimate is 0 if estimation failed.
 func EstimateGas(backend *ethclient.Client, msg ethereum.CallMsg, defaultGas uint64, multiplier float64) (uint64, uint64) {
+	// Clear Gas field to avoid balance validation during estimation.
+	// When Gas is 0, the RPC uses the block gas limit as the cap without
+	// requiring the sender to have sufficient balance for Gas * GasPrice.
+	msg.Gas = 0
+
 	gas, err := backend.EstimateGas(context.Background(), msg)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("Failed to estimate gas, using default %d: %v", defaultGas, err))
