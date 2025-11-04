@@ -47,10 +47,7 @@ func NewDefaultConfig(rpcAddr string, N uint64, accessList bool, rng *rand.Rand)
 	}
 
 	// Setup Keys
-	var keys []*ecdsa.PrivateKey
-	for i := 0; i < len(staticKeys); i++ {
-		keys = append(keys, crypto.ToECDSAUnsafe(common.FromHex(staticKeys[i])))
-	}
+	keys := CreateKeys(100, 0)
 
 	// Enable local nonce tracking by default
 	txfuzz.SetNonceManager(true)
@@ -127,16 +124,22 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 		}
 	}
 
+	// Setup seed
+	seed := c.Int64(flags.SeedFlag.Name)
+	if seed == 0 {
+		rnd := make([]byte, 8)
+		crand.Read(rnd)
+		seed = int64(binary.BigEndian.Uint64(rnd))
+		logger.Debug(fmt.Sprintf("No seed provided, creating random seed: 0x%x", seed))
+	}
+
 	// Setup Keys
-	var keys []*ecdsa.PrivateKey
 	nKeys := c.Int(flags.CountFlag.Name)
-	if nKeys == 0 || nKeys > len(staticKeys) {
-		logger.Debug(fmt.Sprintf("Sanitizing count flag: %d -> %d", nKeys, len(staticKeys)))
-		nKeys = len(staticKeys)
+	if nKeys == 0 {
+		nKeys = 100 // Default to 100 if not specified
 	}
-	for i := 0; i < nKeys; i++ {
-		keys = append(keys, crypto.ToECDSAUnsafe(common.FromHex(staticKeys[i])))
-	}
+	keys := CreateKeys(nKeys, seed)
+	logger.Debug(fmt.Sprintf("Generated %d deterministic accounts from seed 0x%x", nKeys, seed))
 
 	// Setup gasLimit
 	gasLimit := c.Int(flags.GasLimitFlag.Name)
@@ -157,15 +160,6 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 
 	// Setup transaction delay
 	txDelay := c.Int(flags.TxDelayFlag.Name)
-
-	// Setup seed
-	seed := c.Int64(flags.SeedFlag.Name)
-	if seed == 0 {
-		rnd := make([]byte, 8)
-		crand.Read(rnd)
-		seed = int64(binary.BigEndian.Uint64(rnd))
-		logger.Debug(fmt.Sprintf("No seed provided, creating random seed: 0x%x", seed))
-	}
 
 	// Setup Mutator
 	mut := mutator.NewMutator(rand.New(rand.NewSource(seed)))

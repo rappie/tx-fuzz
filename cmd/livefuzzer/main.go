@@ -141,7 +141,11 @@ func run7702Spam(c *cli.Context) error {
 }
 
 func runCreate(c *cli.Context) error {
-	spammer.CreateAddresses(100)
+	nKeys := c.Int(flags.CountFlag.Name)
+	if nKeys == 0 {
+		nKeys = 100
+	}
+	spammer.CreateAddresses(nKeys)
 	return nil
 }
 
