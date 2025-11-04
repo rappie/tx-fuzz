@@ -31,7 +31,6 @@ func SetChainID(chainID *big.Int) {
 // GetChainID returns the chain ID, either from the global setting or by querying the RPC
 func GetChainID(backend *ethclient.Client) *big.Int {
 	if globalChainID != nil {
-		slog.Debug(fmt.Sprintf("Using manually set chain ID: %s", globalChainID.String()))
 		return globalChainID
 	}
 
