@@ -127,6 +127,20 @@ func SendTransaction(ctx context.Context, backend *ethclient.Client, tx *types.T
 
 	// Print detailed transaction info at DEBUG level
 	if slog.Default().Enabled(ctx, slog.LevelDebug) {
+		// Query and log sender balance
+		balance, balErr := backend.BalanceAt(ctx, from, nil)
+		if balErr != nil {
+			slog.Debug(fmt.Sprintf("Sender balance: <query failed: %v>", balErr))
+		} else {
+			if balance.Sign() > 0 {
+				ethValue := new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(1e18))
+				slog.Debug(fmt.Sprintf("Sender balance: %s wei (%.6f ETH)", balance.String(), ethValue))
+			} else {
+				slog.Debug("Sender balance: 0 wei")
+			}
+		}
+
+		// Print detailed transaction info
 		slog.Debug(FormatTransactionDetails(tx, from))
 	}
 
