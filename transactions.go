@@ -125,17 +125,10 @@ func SendTransaction(ctx context.Context, backend *ethclient.Client, tx *types.T
 		to = tx.To().Hex()
 	}
 
-	// Format gas price based on transaction type
-	gasPrice := "unknown"
-	if tx.GasPrice() != nil && tx.GasPrice().Sign() > 0 {
-		gasPrice = tx.GasPrice().String()
-	} else if tx.GasFeeCap() != nil {
-		gasPrice = fmt.Sprintf("tip=%s/cap=%s", tx.GasTipCap().String(), tx.GasFeeCap().String())
+	// Print detailed transaction info at DEBUG level
+	if slog.Default().Enabled(ctx, slog.LevelDebug) {
+		slog.Debug(FormatTransactionDetails(tx, from))
 	}
-
-	// Log before sending
-	slog.Debug(fmt.Sprintf("Sending transaction: from=%s to=%s nonce=%d gas=%d gasPrice=%s value=%s dataLen=%d type=%d",
-		from.Hex(), to, tx.Nonce(), tx.Gas(), gasPrice, tx.Value().String(), len(tx.Data()), tx.Type()))
 
 	// Send transaction
 	err = backend.SendTransaction(ctx, tx)

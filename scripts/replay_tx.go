@@ -89,6 +89,9 @@ func replayTransaction(jsonFile string, rpcURL string) error {
 
 	slog.Info(fmt.Sprintf("Transaction decoded: hash=%s sender=%s gas=%d", tx.Hash().Hex(), sender.Hex(), tx.Gas()))
 
+	// Print comprehensive transaction details
+	fmt.Println(txfuzz.FormatTransactionDetails(&tx, sender))
+
 	// Connect to RPC
 	slog.Info(fmt.Sprintf("Connecting to RPC: %s", rpcURL))
 	backend, err := ethclient.Dial(rpcURL)

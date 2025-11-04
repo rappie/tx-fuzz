@@ -384,7 +384,7 @@ func gatherAccountState(ctx context.Context, backend *ethclient.Client, account 
 // saveToFile writes the failed transaction context to a JSON file
 func saveToFile(ctx FailedTxContext, txType uint8, nonce uint64) error {
 	// Determine transaction type name for filename prefix
-	typeName := getTypeName(txType)
+	typeName := GetTypeName(txType)
 
 	// Create directory structure: baseDir/runID/
 	dir := filepath.Join(storage.baseDir, storage.runID)
@@ -416,24 +416,6 @@ func saveToFile(ctx FailedTxContext, txType uint8, nonce uint64) error {
 	}
 
 	return nil
-}
-
-// getTypeName returns a human-readable name for a transaction type
-func getTypeName(txType uint8) string {
-	switch txType {
-	case types.LegacyTxType:
-		return "legacy"
-	case types.AccessListTxType:
-		return "access_list"
-	case types.DynamicFeeTxType:
-		return "dynamic_fee"
-	case types.BlobTxType:
-		return "blob"
-	case types.SetCodeTxType:
-		return "set_code"
-	default:
-		return fmt.Sprintf("type_%d", txType)
-	}
 }
 
 // bigIntToString safely converts *big.Int to string
