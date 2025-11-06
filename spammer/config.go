@@ -171,6 +171,7 @@ func NewConfigFromContext(c *cli.Context) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+		logger.Info(fmt.Sprintf("Loaded %d corpus elements from %s", len(corpus), corpusFile))
 	}
 
 	// Setup local nonce tracking

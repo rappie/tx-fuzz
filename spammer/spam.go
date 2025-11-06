@@ -25,7 +25,9 @@ func SpamTransactions(config *Config, fun Spam) error {
 
 		var f *filler.Filler
 		if len(config.corpus) != 0 {
-			elem := config.corpus[rand.Int31n(int32(len(config.corpus)))]
+			elemIndex := rand.Int31n(int32(len(config.corpus)))
+			elem := config.corpus[elemIndex]
+			config.Logger.Debug(fmt.Sprintf("Using corpus element %d (%d bytes)", elemIndex, len(elem)))
 			config.mut.MutateBytes(&elem)
 			f = filler.NewFiller(elem)
 		} else {
