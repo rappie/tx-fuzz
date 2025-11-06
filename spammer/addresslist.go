@@ -107,5 +107,9 @@ func Airdrop(config *Config, value *big.Int) error {
 	if _, err := bind.WaitMined(context.Background(), backend, tx); err != nil {
 		return err
 	}
+
+	// Wait 2 seconds after airdrop completes
+	time.Sleep(2 * time.Second)
+
 	return nil
 }
