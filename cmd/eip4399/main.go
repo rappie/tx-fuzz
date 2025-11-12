@@ -25,10 +25,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	chainid, err := backend.ChainID(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	chainid := txfuzz.GetChainID(backend)
 	fmt.Printf("Nonce: %v\n", nonce)
 	gp, _ := backend.SuggestGasPrice(context.Background())
 	tx := types.NewContractCreation(nonce, common.Big1, 500000, gp, []byte{0x44, 0x44, 0x55})

@@ -209,10 +209,7 @@ func makeTxWithValue(addr common.Address, value *big.Int, data []byte) *types.Tr
 	if err != nil {
 		panic(err)
 	}
-	chainid, err := backend.ChainID(ctx)
-	if err != nil {
-		panic(err)
-	}
+	chainid := txfuzz.GetChainID(backend)
 	fmt.Printf("Nonce: %v\n", nonce)
 	gp, err := backend.SuggestGasPrice(ctx)
 	if err != nil {

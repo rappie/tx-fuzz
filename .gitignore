@@ -1,4 +1,5 @@
 cmd/livefuzzer/failed_txs/
+failed_txs/
 
 cmd/eip4399/eip4399
 cmd/livefuzzer/livefuzzer

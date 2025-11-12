@@ -87,6 +87,12 @@ var (
 		Value: false,
 	}
 
+	ChainIDFlag = &cli.Uint64Flag{
+		Name:  "chain-id",
+		Usage: "Chain ID to use (decimal, e.g., 20143). If not set, queries RPC.",
+		Value: 0,
+	}
+
 	SpamFlags = []cli.Flag{
 		SkFlag,
 		SeedFlag,
@@ -102,5 +108,6 @@ var (
 		TxDelayFlag,
 		NoLocalNonceFlag,
 		SaveFailedTxsFlag,
+		ChainIDFlag,
 	}
 )

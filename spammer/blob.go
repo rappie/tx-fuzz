@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/MariusVanDerWijden/FuzzyVM/filler"
@@ -18,11 +17,7 @@ import (
 func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Filler) error {
 	backend := ethclient.NewClient(config.backend)
 	sender := crypto.PubkeyToAddress(key.PublicKey)
-	chainID, err := backend.ChainID(context.Background())
-	if err != nil {
-		config.Logger.Warn(fmt.Sprintf("Failed to get chain ID, using default 0x01000666: %v", err))
-		chainID = big.NewInt(0x01000666)
-	}
+	chainID := txfuzz.GetChainID(backend)
 
 	var lastTx *types.Transaction
 	for i := uint64(0); i < config.N; i++ {
@@ -30,7 +25,7 @@ func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 		if err != nil {
 			return err
 		}
-		tx, err := txfuzz.RandomBlobTx(config.backend, f, sender, nonce, nil, nil, config.accessList, config.GasMultiplier)
+		tx, originalGasEstimate, gasMultiplier, err := txfuzz.RandomBlobTx(config.backend, f, sender, nonce, nil, nil, config.accessList, config.GasMultiplier)
 		if err != nil {
 			config.Logger.Warn(fmt.Sprintf("Failed to create valid blob transaction (nonce=%d): %v", nonce, err))
 			return err
@@ -39,7 +34,7 @@ func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 		if err != nil {
 			return err
 		}
-		if err := txfuzz.SendTransaction(context.Background(), backend, signedTx); err != nil {
+		if err := txfuzz.SendTransaction(context.Background(), backend, signedTx, originalGasEstimate, gasMultiplier); err != nil {
 			return err
 		}
 		lastTx = signedTx
@@ -53,7 +48,7 @@ func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 			config.Logger.Warn(fmt.Sprintf("Waiting for blob transactions to be mined failed: %v", err))
 
 			// Save transaction that timed out waiting to be mined
-			txfuzz.SaveFailedTransaction(context.Background(), backend, lastTx, err)
+			txfuzz.SaveFailedTransaction(context.Background(), backend, lastTx, err, 0, 0)
 		}
 	}
 	return nil

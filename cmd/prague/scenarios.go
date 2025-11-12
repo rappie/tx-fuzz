@@ -180,10 +180,7 @@ func ExecWithSK(backend *ethclient.Client, sk *ecdsa.PrivateKey, addr common.Add
 	cl, _ := helper.GetRealBackend()
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
 
-	chainid, err := backend.ChainID(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	chainid := txfuzz.GetChainID(backend)
 	slog.Debug(fmt.Sprintf("Using nonce %d", nonce))
 	gp, err := backend.SuggestGasPrice(context.Background())
 	if err != nil {
@@ -205,7 +202,7 @@ func ExecWithSK(backend *ethclient.Client, sk *ecdsa.PrivateKey, addr common.Add
 		AccessList:    make(types.AccessList, 0),
 		BlobGasFeeCap: big.NewInt(1_000_000),
 	}
-	msg.Gas = txfuzz.EstimateGas(backend, msg, 5_000_000, 1.0)
+	msg.Gas, _ = txfuzz.EstimateGas(backend, msg, 5_000_000, 1.0)
 
 	var signedTx *types.Transaction
 	if blobs {
