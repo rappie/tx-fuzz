@@ -101,15 +101,14 @@ func Airdrop(config *Config, value *big.Int) error {
 			return err
 		}
 		tx = signedTx
-		time.Sleep(time.Duration(config.TxDelay) * time.Millisecond)
 	}
 	// Wait for the last transaction to be mined
 	if _, err := bind.WaitMined(context.Background(), backend, tx); err != nil {
 		return err
 	}
 
-	// Wait 2 seconds after airdrop completes
-	time.Sleep(2 * time.Second)
+	// Wait after airdrop completes
+	time.Sleep(time.Duration(config.TxDelay) * time.Millisecond)
 
 	return nil
 }
