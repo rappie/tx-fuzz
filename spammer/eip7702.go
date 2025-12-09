@@ -10,19 +10,31 @@ import (
 	"github.com/MariusVanDerWijden/FuzzyVM/filler"
 	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/holiman/uint256"
 )
 
-func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Filler) error {
+func Send7702Transactions(config *Config, key *ecdsa.PrivateKey) error {
 	backend := ethclient.NewClient(config.backend)
 	sender := crypto.PubkeyToAddress(key.PublicKey)
 	chainID := txfuzz.GetChainID(backend)
 
+	var deployedContracts []common.Address
 	var lastTx *types.Transaction
+
 	for i := uint64(0); i < config.N; i++ {
+		// Create fresh filler with context for each transaction
+		f := CreateFiller(config)
+		f.Ctx = &filler.Context{
+			InterestingAddresses: append(
+				[]common.Address{sender},
+				deployedContracts...,
+			),
+		}
+
 		nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 		if err != nil {
 			return err
@@ -50,6 +62,14 @@ func Send7702Transactions(config *Config, key *ecdsa.PrivateKey, f *filler.Fille
 			config.Logger.Warn(fmt.Sprintf("Failed to create valid EIP-7702 transaction (nonce=%d): %v", nonce, err))
 			return err
 		}
+
+		// Track contract deployments
+		if tx.To() == nil {
+			contractAddr := crypto.CreateAddress(sender, nonce)
+			deployedContracts = append(deployedContracts, contractAddr)
+			config.Logger.Debug(fmt.Sprintf("Tracking deployed contract: %s", contractAddr.Hex()))
+		}
+
 		signedTx, err := types.SignTx(tx, types.NewPragueSigner(chainID), key)
 		if err != nil {
 			return err
