@@ -8,6 +8,7 @@ cmd/shanghai/shanghai
 eip4399
 cancun
 shanghai
+livefuzzer
 
 
 .idea
