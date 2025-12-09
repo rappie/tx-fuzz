@@ -37,6 +37,9 @@ func SpamTransactions(config *Config, fun Spam) error {
 // CreateFiller creates a new filler from corpus or random data.
 // Should be called per-transaction to get fresh mutations.
 func CreateFiller(config *Config) *filler.Filler {
+	config.mutMu.Lock()
+	defer config.mutMu.Unlock()
+
 	if len(config.corpus) != 0 {
 		elemIndex := rand.Int31n(int32(len(config.corpus)))
 		// Copy corpus element to avoid mutating the original
