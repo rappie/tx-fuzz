@@ -9,18 +9,25 @@ import (
 	"github.com/MariusVanDerWijden/FuzzyVM/filler"
 	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey, f *filler.Filler) error {
+func SendBlobTransactions(config *Config, key *ecdsa.PrivateKey) error {
 	backend := ethclient.NewClient(config.backend)
 	sender := crypto.PubkeyToAddress(key.PublicKey)
 	chainID := txfuzz.GetChainID(backend)
 
 	var lastTx *types.Transaction
 	for i := uint64(0); i < config.N; i++ {
+		// Create fresh filler with context for each transaction
+		f := CreateFiller(config)
+		f.Ctx = &filler.Context{
+			InterestingAddresses: []common.Address{sender},
+		}
+
 		nonce, err := txfuzz.GetPendingNonce(context.Background(), backend, sender)
 		if err != nil {
 			return err

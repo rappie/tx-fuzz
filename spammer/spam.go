@@ -9,7 +9,7 @@ import (
 	"github.com/MariusVanDerWijden/FuzzyVM/filler"
 )
 
-type Spam func(*Config, *ecdsa.PrivateKey, *filler.Filler) error
+type Spam func(*Config, *ecdsa.PrivateKey) error
 
 func SpamTransactions(config *Config, fun Spam) error {
 	config.Logger.Info(fmt.Sprintf("Starting transaction spam: %d tx/account, %d accounts, seed=0x%x",
@@ -19,27 +19,11 @@ func SpamTransactions(config *Config, fun Spam) error {
 	var wg sync.WaitGroup
 	wg.Add(len(config.keys))
 	for _, key := range config.keys {
-		// Setup randomness uniquely per key
-		random := make([]byte, 10000)
-		config.mut.FillBytes(&random)
-
-		var f *filler.Filler
-		if len(config.corpus) != 0 {
-			elemIndex := rand.Int31n(int32(len(config.corpus)))
-			elem := config.corpus[elemIndex]
-			config.Logger.Debug(fmt.Sprintf("Using corpus element %d (%d bytes)", elemIndex, len(elem)))
-			config.mut.MutateBytes(&elem)
-			f = filler.NewFiller(elem)
-		} else {
-			// Use lower entropy randomness for filler
-			config.mut.MutateBytes(&random)
-			f = filler.NewFiller(random)
-		}
 		// Start a fuzzing thread
-		go func(key *ecdsa.PrivateKey, filler *filler.Filler) {
+		go func(key *ecdsa.PrivateKey) {
 			defer wg.Done()
-			errCh <- fun(config, key, filler)
-		}(key, f)
+			errCh <- fun(config, key)
+		}(key)
 	}
 	wg.Wait()
 	select {
@@ -48,4 +32,25 @@ func SpamTransactions(config *Config, fun Spam) error {
 	default:
 		return nil
 	}
+}
+
+// CreateFiller creates a new filler from corpus or random data.
+// Should be called per-transaction to get fresh mutations.
+func CreateFiller(config *Config) *filler.Filler {
+	config.mutMu.Lock()
+	defer config.mutMu.Unlock()
+
+	if len(config.corpus) != 0 {
+		elemIndex := rand.Int31n(int32(len(config.corpus)))
+		// Copy corpus element to avoid mutating the original
+		elem := make([]byte, len(config.corpus[elemIndex]))
+		copy(elem, config.corpus[elemIndex])
+		config.mut.MutateBytes(&elem)
+		return filler.NewFiller(elem)
+	}
+	// Use random data
+	random := make([]byte, 10000)
+	config.mut.FillBytes(&random)
+	config.mut.MutateBytes(&random)
+	return filler.NewFiller(random)
 }

@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"sync"
 
 	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/MariusVanDerWijden/tx-fuzz/flags"
@@ -35,8 +36,9 @@ type Config struct {
 	TxDelay       uint64              // delay between transactions in milliseconds
 	SlotTime      uint64              // slot time in seconds
 
-	seed int64            // seed used for generating randomness
-	mut  *mutator.Mutator // Mutator based on the seed
+	seed  int64            // seed used for generating randomness
+	mut   *mutator.Mutator // Mutator based on the seed
+	mutMu sync.Mutex       // protects mut
 }
 
 func NewDefaultConfig(rpcAddr string, N uint64, accessList bool, rng *rand.Rand) (*Config, error) {

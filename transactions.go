@@ -192,7 +192,11 @@ func initDefaultTxConf(rpc *rpc.Client, f *filler.Filler, sender common.Address,
 	gasCost := uint64(100000)
 	to := randomAddress()
 	code := RandomCode(f)
+	// 75% chance of non-zero value (0 to 0.01 ETH)
 	value := big.NewInt(0)
+	if rand.Intn(4) != 0 {
+		value = big.NewInt(rand.Int63n(10_000_000_000_000_000)) // max 0.01 ETH
+	}
 	if len(code) > 128 {
 		code = code[:128]
 	}
